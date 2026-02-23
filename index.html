@@ -8,35 +8,105 @@
 </head>
 
 <body>
-
-  <header>
-    <h1>Troubleshooting Checklist Portal</h1>
-    <p>Internal Support & Investigation Guide</p>
+  <header class="site-header">
+    <div class="header-inner">
+      <h1>Troubleshooting Checklist Portal</h1>
+      <p>Internal Support & Investigation Guide</p>
+    </div>
   </header>
 
-  <main>
-    <div class="dashboard-container">
-
-      <div class="dashboard-card">
-        <h2>Common Issues</h2>
-        <p>View existing troubleshooting checklists and known issue patterns.</p>
-        <button id="openIssuesBtn">
-          Open Common Issues
-        </button>
-      </div>
-
-      <div class="dashboard-card">
-        <h2>Add New Issue Checklist</h2>
-        <p>Create a new troubleshooting checklist for recurring incidents.</p>
-        <button id="newIssueBtn">
-          Create New Checklist
-        </button>
-      </div>
-
+  <nav class="top-nav">
+    <div class="nav-inner">
+      <button class="tab-btn active" data-tab="common">Common Issues</button>
+      <button class="tab-btn" data-tab="new">New Issue</button>
     </div>
+  </nav>
+
+  <main class="container">
+
+    <!-- COMMON ISSUES TAB -->
+    <section id="tab-common" class="tab-section">
+      <div class="section-header">
+        <div>
+          <h2>Common Issues</h2>
+          <p class="muted">Issues saved from the “New Issue” tab will appear here automatically.</p>
+        </div>
+        <div class="section-actions">
+          <button id="clearAllBtn" class="btn btn-ghost" type="button">Clear All</button>
+        </div>
+      </div>
+
+      <div id="issuesEmptyState" class="empty-state">
+        <h3>No issues yet</h3>
+        <p>Add your first issue using the “New Issue” tab.</p>
+      </div>
+
+      <div id="issuesList" class="issues-grid"></div>
+    </section>
+
+    <!-- NEW ISSUE TAB -->
+    <section id="tab-new" class="tab-section hidden">
+      <div class="section-header">
+        <div>
+          <h2>New Issue</h2>
+          <p class="muted">Fill this form and click “Save”. The issue will show up in “Common Issues”.</p>
+        </div>
+      </div>
+
+      <div class="card form-card">
+        <form id="issueForm" autocomplete="off">
+
+          <div class="form-row">
+            <label for="issueDescription">Issue Description</label>
+            <input id="issueDescription" type="text" placeholder='Example: "409 Error"' required />
+          </div>
+
+          <div class="form-row">
+            <label for="rootCause">Root Cause</label>
+            <input id="rootCause" type="text" placeholder='Example: "Server Misconfiguration"' required />
+          </div>
+
+          <div class="form-row">
+            <label for="checklists">Checklists (bullet points)</label>
+            <textarea id="checklists" rows="5" placeholder="Write one checklist item per line&#10;Example:&#10;Check server settings&#10;Review application logs" required></textarea>
+            <div class="hint">Tip: Press Enter for a new checklist bullet.</div>
+          </div>
+
+          <div class="form-row">
+            <label for="zendeskLink">Zendesk Ticket Link</label>
+            <input id="zendeskLink" type="url" placeholder="https://your-zendesk-link" />
+          </div>
+
+          <div class="form-row">
+            <label for="solution">Solution</label>
+            <textarea id="solution" rows="6" placeholder="Write the solution in detail..." required></textarea>
+          </div>
+
+          <div class="form-row">
+            <label for="templateSelect">Ready-Made Email Template</label>
+            <select id="templateSelect">
+              <option value="template1">Template 1 (Short)</option>
+              <option value="template2">Template 2 (Detailed)</option>
+              <option value="template3">Template 3 (Customer-friendly)</option>
+            </select>
+
+            <textarea id="templateText" rows="7" placeholder="Template text will appear here..."></textarea>
+            <div class="hint">You can edit the template text before saving.</div>
+          </div>
+
+          <div class="form-actions">
+            <button id="saveBtn" class="btn btn-primary" type="submit">Save</button>
+            <button id="resetBtn" class="btn btn-ghost" type="button">Reset</button>
+          </div>
+
+        </form>
+      </div>
+
+    </section>
+
   </main>
 
-  <footer>
+  <footer class="site-footer">
     Internal Use Only | Troubleshooting Portal
   </footer>
 
