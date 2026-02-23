@@ -17,7 +17,18 @@
     <button onclick="showSection('logs')">Logs</button>
     <button onclick="showSection('tenant')">Tenant Checks</button>
     <button onclick="showSection('issues')">Common Issues</button>
+    
 </nav>
+
+<div style="text-align:center; margin: 16px;">
+  <input 
+    type="text" 
+    id="searchInput" 
+    placeholder="Search troubleshooting topics..." 
+    style="padding:10px; width:280px; border-radius:8px; border:1px solid #ccc;"
+    onkeyup="searchContent()"
+  />
+</div>
 
 <main>
 
