@@ -1,11 +1,15 @@
-// -----------------------------
-// Simple storage (localStorage)
-// -----------------------------
-const STORAGE_KEY = "troubleshooting_issues_v1";
+/* =========================
+   Troubleshooting Portal
+   - Stores issues in localStorage
+   - Common Issues: list titles only
+   - Click title -> details panel
+   - Edit mode lets you edit all fields + templates
+========================= */
 
-// -----------------------------
-// App list (defaults)
-// -----------------------------
+const STORAGE_KEY = "troubleshooting_issues_v2";
+const APP_STORAGE_KEY = "troubleshooting_apps_v2";
+
+// Default applications (your list)
 const DEFAULT_APPS = [
   "Active Directory",
   "Azure AD",
@@ -13,14 +17,12 @@ const DEFAULT_APPS = [
   "ADP",
   "Paycor",
   "Dayforce",
-  "Paylocity"
+  "Paylocity",
 ];
 
-// -----------------------------
-// Template defaults
-// -----------------------------
+// Default templates (you can edit these)
 const DEFAULT_TEMPLATES = [
-`Subject: Update on your issue
+  `Subject: Update on your issue
 
 Hi there,
 
@@ -28,413 +30,561 @@ Thanks for your patience. We investigated the issue and have identified the caus
 We are applying the fix now and will confirm once everything is stable.
 
 Regards,`,
-`Subject: We found the cause and next steps
+  `Subject: Next steps for your issue
 
 Hi there,
 
-We’ve identified the root cause and are taking the next steps listed below.
-If you need anything urgently, reply to this email and we’ll prioritize.
+We found what caused the issue. Please follow the steps below:
+- Step 1:
+- Step 2:
+
+If you'd like, share any error screenshots/logs and we can validate quickly.
 
 Regards,`,
-`Subject: Issue resolved
+  `Subject: Issue resolved
 
 Hi there,
 
-The issue has been resolved and we’re monitoring to ensure it stays stable.
-If you notice the same problem again, please reply with the time it happened.
+Good news — the issue is resolved.
+If you see the problem again, please reply to this message with the time it occurred.
 
-Regards,`
+Regards,`,
 ];
 
-// -----------------------------
-// State for "New Issues" form
-// -----------------------------
-let formTemplates = [];        // array of strings
-let activeTemplateIndex = 0;
+let issues = [];
+let applications = [];
+let activeTab = "common"; // "common" | "new"
+let selectedIssueId = null;
 
-// -----------------------------
-// Helpers
-// -----------------------------
+// Common view state
+let commonSearch = "";
+
+// New issue template state
+let newIssueTemplateIndex = 0;
+let newIssueTemplates = [...DEFAULT_TEMPLATES];
+
+// Edit issue template state
+let editIssueTemplateIndex = 0;
+
+function $(id) {
+  return document.getElementById(id);
+}
+
+function safeText(v) {
+  return (v ?? "").toString();
+}
+
 function loadIssues() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     return raw ? JSON.parse(raw) : [];
-  } catch (e) {
+  } catch {
     return [];
   }
 }
 
-function saveIssues(issues) {
+function saveIssues() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(issues));
 }
 
-function uid() {
-  return Math.random().toString(16).slice(2) + Date.now().toString(16);
+function loadApps() {
+  try {
+    const raw = localStorage.getItem(APP_STORAGE_KEY);
+    if (!raw) return [...DEFAULT_APPS];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed) || parsed.length === 0) return [...DEFAULT_APPS];
+    return parsed;
+  } catch {
+    return [...DEFAULT_APPS];
+  }
 }
 
-function escapeHtml(str) {
-  return String(str || "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
+function saveApps() {
+  localStorage.setItem(APP_STORAGE_KEY, JSON.stringify(applications));
 }
 
-function linesToBullets(text) {
-  return String(text || "")
+function makeId() {
+  return "iss_" + Math.random().toString(16).slice(2) + "_" + Date.now();
+}
+
+function parseChecklist(text) {
+  return safeText(text)
     .split("\n")
     .map(s => s.trim())
     .filter(Boolean);
 }
 
-// -----------------------------
-// Tabs
-// -----------------------------
-function setActiveTab(tabName) {
-  document.querySelectorAll(".tab-btn").forEach(btn => {
-    const isActive = btn.dataset.tab === tabName;
-    btn.classList.toggle("active", isActive);
-    btn.setAttribute("aria-selected", isActive ? "true" : "false");
-  });
+function formatTitle(issue) {
+  // Title shown in list (just the main label)
+  // Example: "409 - User principal name already exists"
+  return safeText(issue.issueDescription).trim() || "(Untitled issue)";
+}
 
-  document.getElementById("tab-common").classList.toggle("active", tabName === "common");
-  document.getElementById("tab-new").classList.toggle("active", tabName === "new");
+function matchesSearch(issue, q) {
+  if (!q) return true;
+  const hay = [
+    issue.issueDescription,
+    issue.application,
+    issue.rootCause,
+    ...(issue.checklist || []),
+    issue.solution,
+  ]
+    .join(" ")
+    .toLowerCase();
+  return hay.includes(q.toLowerCase());
+}
 
-  // Render common issues when switching there
-  if (tabName === "common") {
-    renderIssues();
+function setTab(tabName) {
+  activeTab = tabName;
+
+  $("tabCommonBtn").classList.toggle("active", tabName === "common");
+  $("tabNewBtn").classList.toggle("active", tabName === "new");
+
+  $("commonView").classList.toggle("hidden", tabName !== "common");
+  $("newView").classList.toggle("hidden", tabName !== "new");
+
+  // Search only applies to common view; keep it visible, but behavior is for list
+  if (tabName === "new") {
+    // Optional: keep search text but doesn't matter
   }
 }
 
-function wireTopTabs() {
-  document.querySelectorAll(".tab-btn").forEach(btn => {
-    btn.addEventListener("click", () => setActiveTab(btn.dataset.tab));
-  });
-}
+function renderApplications(selectEl, selectedValue) {
+  selectEl.innerHTML = "";
 
-// -----------------------------
-// Application dropdown + add new
-// -----------------------------
-function fillApplicationSelect() {
-  const sel = document.getElementById("applicationSelect");
-  sel.innerHTML = "";
-
-  // Add a placeholder option
   const placeholder = document.createElement("option");
   placeholder.value = "";
   placeholder.textContent = "Select application";
   placeholder.disabled = true;
-  placeholder.selected = true;
-  sel.appendChild(placeholder);
+  placeholder.selected = !selectedValue;
+  selectEl.appendChild(placeholder);
 
-  DEFAULT_APPS.forEach(app => {
+  applications.forEach(app => {
     const opt = document.createElement("option");
     opt.value = app;
     opt.textContent = app;
-    sel.appendChild(opt);
+    if (selectedValue && selectedValue === app) opt.selected = true;
+    selectEl.appendChild(opt);
   });
 }
 
-function wireAddApplication() {
-  const addBtn = document.getElementById("addAppBtn");
-  const row = document.getElementById("addAppRow");
-  const input = document.getElementById("newAppName");
-  const saveBtn = document.getElementById("saveAppBtn");
-  const cancelBtn = document.getElementById("cancelAppBtn");
-  const sel = document.getElementById("applicationSelect");
-
-  addBtn.addEventListener("click", () => {
-    row.classList.remove("hidden");
-    input.value = "";
-    input.focus();
-  });
-
-  cancelBtn.addEventListener("click", () => {
-    row.classList.add("hidden");
-    input.value = "";
-  });
-
-  saveBtn.addEventListener("click", () => {
-    const name = input.value.trim();
-    if (!name) return;
-
-    // Add to dropdown immediately (not to DEFAULT_APPS array)
-    const opt = document.createElement("option");
-    opt.value = name;
-    opt.textContent = name;
-    sel.appendChild(opt);
-
-    sel.value = name;
-    row.classList.add("hidden");
-    input.value = "";
-  });
+function ensureSelectedIssueStillExists() {
+  if (!selectedIssueId) return;
+  const exists = issues.some(i => i.id === selectedIssueId);
+  if (!exists) selectedIssueId = null;
 }
 
-// -----------------------------
-// Templates (tabs + add more)
-// -----------------------------
-function ensureDefaultTemplates() {
-  if (formTemplates.length === 0) {
-    formTemplates = [...DEFAULT_TEMPLATES];
-    activeTemplateIndex = 0;
-  }
-}
-
-function renderTemplateTabs() {
-  const bar = document.getElementById("templateTabBar");
-  bar.innerHTML = "";
-
-  formTemplates.forEach((_, idx) => {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "template-tab" + (idx === activeTemplateIndex ? " active" : "");
-    btn.textContent = `Template ${idx + 1}`;
-    btn.addEventListener("click", () => {
-      // Save current editor text into current template before switching
-      formTemplates[activeTemplateIndex] = document.getElementById("templateEditor").value;
-      activeTemplateIndex = idx;
-      syncTemplateEditor();
-      renderTemplateTabs();
-    });
-    bar.appendChild(btn);
-  });
-}
-
-function syncTemplateEditor() {
-  const editor = document.getElementById("templateEditor");
-  editor.value = formTemplates[activeTemplateIndex] || "";
-}
-
-function wireTemplateControls() {
-  const addBtn = document.getElementById("addTemplateBtn");
-  const editor = document.getElementById("templateEditor");
-
-  // Keep state updated as user types
-  editor.addEventListener("input", () => {
-    formTemplates[activeTemplateIndex] = editor.value;
-  });
-
-  addBtn.addEventListener("click", () => {
-    // Save current editor into current template first
-    formTemplates[activeTemplateIndex] = editor.value;
-
-    // Add a new empty template
-    formTemplates.push(`Subject: \n\nHi there,\n\n\nRegards,`);
-    activeTemplateIndex = formTemplates.length - 1;
-
-    renderTemplateTabs();
-    syncTemplateEditor();
-    editor.focus();
-  });
-}
-
-// -----------------------------
-// Save / Reset form
-// -----------------------------
-function wireForm() {
-  const form = document.getElementById("issueForm");
-  const resetBtn = document.getElementById("resetBtn");
-
-  form.addEventListener("submit", (e) => {
-    e.preventDefault();
-
-    // Always capture latest editor text
-    formTemplates[activeTemplateIndex] = document.getElementById("templateEditor").value;
-
-    const issueDescription = document.getElementById("issueDescription").value.trim();
-    const application = document.getElementById("applicationSelect").value;
-    const rootCause = document.getElementById("rootCause").value.trim();
-    const checklistsText = document.getElementById("checklists").value;
-    const zendeskLink = document.getElementById("zendeskLink").value.trim();
-    const solution = document.getElementById("solution").value.trim();
-
-    if (!issueDescription) return;
-    if (!application) return;
-
-    const issue = {
-      id: uid(),
-      issueDescription,
-      application,
-      rootCause,
-      checklists: linesToBullets(checklistsText),
-      zendeskLink,
-      solution,
-      templates: formTemplates.filter(t => String(t).trim().length > 0)
-    };
-
-    const issues = loadIssues();
-    issues.unshift(issue); // newest first
-    saveIssues(issues);
-
-    // Reset form + go to Common Issues
-    resetForm();
-    setActiveTab("common");
-  });
-
-  resetBtn.addEventListener("click", () => resetForm());
-}
-
-function resetForm() {
-  document.getElementById("issueDescription").value = "";
-  document.getElementById("rootCause").value = "";
-  document.getElementById("checklists").value = "";
-  document.getElementById("zendeskLink").value = "";
-  document.getElementById("solution").value = "";
-
-  // Reset application select
-  const sel = document.getElementById("applicationSelect");
-  sel.value = "";
-
-  // Reset template state
-  formTemplates = [...DEFAULT_TEMPLATES];
-  activeTemplateIndex = 0;
-  renderTemplateTabs();
-  syncTemplateEditor();
-}
-
-// -----------------------------
-// Common Issues rendering
-// -----------------------------
-function renderIssues() {
-  const issues = loadIssues();
-  const list = document.getElementById("issuesList");
-  const empty = document.getElementById("issuesEmptyState");
-
+function renderIssueList() {
+  const list = $("issueList");
+  const empty = $("emptyState");
   list.innerHTML = "";
 
-  const query = (document.getElementById("searchInput").value || "").trim().toLowerCase();
+  const filtered = issues.filter(i => matchesSearch(i, commonSearch));
+  $("issuesCountPill").textContent = filtered.length;
 
-  const filtered = issues.filter(issue => {
-    if (!query) return true;
+  if (filtered.length === 0) {
+    empty.classList.remove("hidden");
+  } else {
+    empty.classList.add("hidden");
+  }
 
-    const haystack = [
-      issue.issueDescription,
-      issue.application,
-      issue.rootCause,
-      (issue.checklists || []).join(" "),
-      issue.solution,
-      issue.zendeskLink,
-      (issue.templates || []).join(" ")
-    ].join(" ").toLowerCase();
+  filtered
+    // newest first
+    .slice()
+    .sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt))
+    .forEach(issue => {
+      const li = document.createElement("li");
+      li.className = "issue-item" + (issue.id === selectedIssueId ? " active" : "");
+      li.dataset.issueId = issue.id;
 
-    return haystack.includes(query);
-  });
+      const title = document.createElement("p");
+      title.className = "issue-item-title";
+      title.textContent = formatTitle(issue);
 
-  empty.style.display = filtered.length ? "none" : "block";
+      const sub = document.createElement("p");
+      sub.className = "issue-item-sub";
+      sub.textContent = issue.application ? `Application: ${issue.application}` : "Application: (not set)";
 
-  filtered.forEach(issue => {
-    const card = document.createElement("div");
-    card.className = "issue-card";
+      li.appendChild(title);
+      li.appendChild(sub);
 
-    card.innerHTML = `
-      <div class="issue-title">
-        <h3>${escapeHtml(issue.issueDescription)}</h3>
-        <span class="badge">${escapeHtml(issue.application || "Unknown app")}</span>
-      </div>
-
-      ${issue.rootCause ? `<div class="issue-meta"><strong>Root cause:</strong> ${escapeHtml(issue.rootCause)}</div>` : ""}
-
-      <div class="issue-section">
-        <h4>Checklist</h4>
-        ${
-          (issue.checklists && issue.checklists.length)
-            ? `<ul>${issue.checklists.map(i => `<li>${escapeHtml(i)}</li>`).join("")}</ul>`
-            : `<p>No checklist added.</p>`
-        }
-      </div>
-
-      <div class="issue-section">
-        <h4>Zendesk</h4>
-        ${
-          issue.zendeskLink
-            ? `<p class="issue-link"><a href="${escapeHtml(issue.zendeskLink)}" target="_blank" rel="noreferrer">Open ticket</a></p>`
-            : `<p>No ticket link.</p>`
-        }
-      </div>
-
-      <div class="issue-section">
-        <h4>Solution</h4>
-        <p>${issue.solution ? escapeHtml(issue.solution) : "No solution added."}</p>
-      </div>
-
-      <div class="issue-section">
-        <h4>Email Templates</h4>
-        <div class="template-viewer" data-issue-id="${escapeHtml(issue.id)}">
-          <div class="template-tabbar" data-role="tabs"></div>
-          <div class="template-box" data-role="box"></div>
-        </div>
-      </div>
-    `;
-
-    list.appendChild(card);
-
-    // Build template tabs for this card
-    buildIssueTemplateViewer(issue);
-  });
-}
-
-function buildIssueTemplateViewer(issue) {
-  const viewer = document.querySelector(`.template-viewer[data-issue-id="${CSS.escape(issue.id)}"]`);
-  if (!viewer) return;
-
-  const tabsBar = viewer.querySelector('[data-role="tabs"]');
-  const box = viewer.querySelector('[data-role="box"]');
-
-  const templates = (issue.templates && issue.templates.length) ? issue.templates : ["No templates saved."];
-
-  let activeIdx = 0;
-
-  function renderTabs() {
-    tabsBar.innerHTML = "";
-    templates.forEach((_, idx) => {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "template-tab" + (idx === activeIdx ? " active" : "");
-      btn.textContent = `Template ${idx + 1}`;
-      btn.addEventListener("click", () => {
-        activeIdx = idx;
-        renderTabs();
-        renderBox();
+      li.addEventListener("click", () => {
+        selectedIssueId = issue.id;
+        renderIssueList();
+        renderIssueDetailsView();
       });
-      tabsBar.appendChild(btn);
+
+      list.appendChild(li);
     });
-  }
-
-  function renderBox() {
-    box.textContent = templates[activeIdx] || "";
-  }
-
-  renderTabs();
-  renderBox();
 }
 
-// -----------------------------
-// Search
-// -----------------------------
-function searchContent() {
-  // Only affects Common Issues list
-  if (document.getElementById("tab-common").classList.contains("active")) {
-    renderIssues();
-  }
+function setDetailsButtonsEnabled(enabled) {
+  $("editIssueBtn").disabled = !enabled;
+  $("deleteIssueBtn").disabled = !enabled;
 }
 
-// -----------------------------
-// Init
-// -----------------------------
+function showDetailsPlaceholder(show) {
+  $("detailsPlaceholder").classList.toggle("hidden", !show);
+}
+
+function showDetailsView(show) {
+  $("issueDetailsView").classList.toggle("hidden", !show);
+}
+
+function showEditForm(show) {
+  $("issueEditForm").classList.toggle("hidden", !show);
+}
+
+function renderTemplateTabs(container, templates, activeIndex, onClickIndex) {
+  container.innerHTML = "";
+  templates.forEach((_, idx) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "template-tab" + (idx === activeIndex ? " active" : "");
+    btn.textContent = `Template ${idx + 1}`;
+    btn.addEventListener("click", () => onClickIndex(idx));
+    container.appendChild(btn);
+  });
+}
+
+function renderIssueDetailsView() {
+  const issue = issues.find(i => i.id === selectedIssueId);
+
+  if (!issue) {
+    setDetailsButtonsEnabled(false);
+    showDetailsPlaceholder(true);
+    showDetailsView(false);
+    showEditForm(false);
+    return;
+  }
+
+  setDetailsButtonsEnabled(true);
+  showDetailsPlaceholder(false);
+  showDetailsView(true);
+  showEditForm(false);
+
+  $("viewTitle").textContent = formatTitle(issue);
+  $("viewAppPill").textContent = issue.application || "No application";
+  $("viewRootCause").textContent = issue.rootCause || "";
+
+  // checklist bullets
+  const ul = $("viewChecklist");
+  ul.innerHTML = "";
+  (issue.checklist || []).forEach(item => {
+    const li = document.createElement("li");
+    li.textContent = item;
+    ul.appendChild(li);
+  });
+
+  // zendesk link
+  const z = $("viewZendesk");
+  const link = safeText(issue.zendeskTicket).trim();
+  if (link) {
+    z.href = link;
+    z.textContent = link;
+    z.classList.remove("muted");
+  } else {
+    z.href = "#";
+    z.textContent = "(no link)";
+    z.classList.add("muted");
+  }
+
+  $("viewSolution").textContent = issue.solution || "";
+
+  // templates
+  const templates = Array.isArray(issue.templates) && issue.templates.length > 0
+    ? issue.templates
+    : ["(No templates saved)"];
+
+  // keep active index safe
+  if (editIssueTemplateIndex >= templates.length) editIssueTemplateIndex = 0;
+
+  renderTemplateTabs($("viewTemplateTabs"), templates, editIssueTemplateIndex, (idx) => {
+    editIssueTemplateIndex = idx;
+    $("viewTemplateText").textContent = templates[editIssueTemplateIndex] || "";
+    // also keep edit in sync if they go into edit later
+  });
+
+  $("viewTemplateText").textContent = templates[editIssueTemplateIndex] || "";
+}
+
+function enterEditMode() {
+  const issue = issues.find(i => i.id === selectedIssueId);
+  if (!issue) return;
+
+  showDetailsPlaceholder(false);
+  showDetailsView(false);
+  showEditForm(true);
+
+  $("editIssueDescription").value = issue.issueDescription || "";
+  renderApplications($("editApplicationSelect"), issue.application || "");
+  $("editRootCause").value = issue.rootCause || "";
+  $("editChecklist").value = (issue.checklist || []).join("\n");
+  $("editZendesk").value = issue.zendeskTicket || "";
+  $("editSolution").value = issue.solution || "";
+
+  // templates in edit
+  const templates = Array.isArray(issue.templates) && issue.templates.length > 0
+    ? issue.templates
+    : [...DEFAULT_TEMPLATES];
+
+  issue.templates = templates;
+
+  if (editIssueTemplateIndex >= templates.length) editIssueTemplateIndex = 0;
+
+  renderTemplateTabs($("editTemplateTabs"), templates, editIssueTemplateIndex, (idx) => {
+    editIssueTemplateIndex = idx;
+    $("editTemplateText").value = templates[editIssueTemplateIndex] || "";
+    renderTemplateTabs($("editTemplateTabs"), templates, editIssueTemplateIndex, () => {});
+    // re-render with click handlers again properly:
+    renderTemplateTabs($("editTemplateTabs"), templates, editIssueTemplateIndex, (newIdx) => {
+      editIssueTemplateIndex = newIdx;
+      $("editTemplateText").value = templates[editIssueTemplateIndex] || "";
+      // refresh tabs
+      renderTemplateTabs($("editTemplateTabs"), templates, editIssueTemplateIndex, arguments.callee);
+    });
+  });
+
+  // cleaner way: set once
+  renderTemplateTabs($("editTemplateTabs"), templates, editIssueTemplateIndex, (idx) => {
+    editIssueTemplateIndex = idx;
+    $("editTemplateText").value = templates[editIssueTemplateIndex] || "";
+    renderTemplateTabs($("editTemplateTabs"), templates, editIssueTemplateIndex, (i2) => {
+      editIssueTemplateIndex = i2;
+      $("editTemplateText").value = templates[editIssueTemplateIndex] || "";
+      renderTemplateTabs($("editTemplateTabs"), templates, editIssueTemplateIndex, (i3) => {
+        editIssueTemplateIndex = i3;
+        $("editTemplateText").value = templates[editIssueTemplateIndex] || "";
+        // recursion is ugly; keep it simple by just calling setEditTemplateIndex
+      });
+    });
+  });
+
+  // Actually implement tab switching simply:
+  renderTemplateTabs($("editTemplateTabs"), templates, editIssueTemplateIndex, setEditTemplateIndex);
+
+  $("editTemplateText").value = templates[editIssueTemplateIndex] || "";
+}
+
+function setEditTemplateIndex(idx) {
+  const issue = issues.find(i => i.id === selectedIssueId);
+  if (!issue) return;
+  const templates = issue.templates || [];
+  editIssueTemplateIndex = Math.max(0, Math.min(idx, templates.length - 1));
+  renderTemplateTabs($("editTemplateTabs"), templates, editIssueTemplateIndex, setEditTemplateIndex);
+  $("editTemplateText").value = templates[editIssueTemplateIndex] || "";
+}
+
+function addNewTemplateToSelectedIssue() {
+  const issue = issues.find(i => i.id === selectedIssueId);
+  if (!issue) return;
+  if (!Array.isArray(issue.templates)) issue.templates = [];
+  issue.templates.push(`Subject: \n\nHi there,\n\n\nRegards,`);
+  editIssueTemplateIndex = issue.templates.length - 1;
+  renderTemplateTabs($("editTemplateTabs"), issue.templates, editIssueTemplateIndex, setEditTemplateIndex);
+  $("editTemplateText").value = issue.templates[editIssueTemplateIndex] || "";
+}
+
+function saveEditedIssue(e) {
+  e.preventDefault();
+  const issue = issues.find(i => i.id === selectedIssueId);
+  if (!issue) return;
+
+  // Update current template text before saving
+  if (Array.isArray(issue.templates) && issue.templates.length > 0) {
+    issue.templates[editIssueTemplateIndex] = $("editTemplateText").value;
+  }
+
+  issue.issueDescription = $("editIssueDescription").value.trim();
+  issue.application = $("editApplicationSelect").value;
+  issue.rootCause = $("editRootCause").value.trim();
+  issue.checklist = parseChecklist($("editChecklist").value);
+  issue.zendeskTicket = $("editZendesk").value.trim();
+  issue.solution = $("editSolution").value.trim();
+  issue.updatedAt = Date.now();
+
+  saveIssues();
+
+  // back to view
+  showEditForm(false);
+  showDetailsView(true);
+
+  renderIssueList();
+  renderIssueDetailsView();
+}
+
+function cancelEdit() {
+  // discard UI changes; reload view
+  renderIssueDetailsView();
+}
+
+function deleteSelectedIssue() {
+  const issue = issues.find(i => i.id === selectedIssueId);
+  if (!issue) return;
+
+  const ok = confirm(`Delete this issue?\n\n"${formatTitle(issue)}"`);
+  if (!ok) return;
+
+  issues = issues.filter(i => i.id !== selectedIssueId);
+  selectedIssueId = null;
+  saveIssues();
+
+  renderIssueList();
+  renderIssueDetailsView();
+}
+
+function promptAddApplication(selectEl) {
+  const name = prompt("Enter the new application name (example: BambooHR):");
+  if (!name) return;
+  const cleaned = name.trim();
+  if (!cleaned) return;
+
+  const exists = applications.some(a => a.toLowerCase() === cleaned.toLowerCase());
+  if (!exists) {
+    applications.push(cleaned);
+    applications.sort((a,b) => a.localeCompare(b));
+    saveApps();
+  }
+
+  renderApplications(selectEl, cleaned);
+}
+
+function renderNewTemplates() {
+  // safe index
+  if (newIssueTemplateIndex >= newIssueTemplates.length) newIssueTemplateIndex = 0;
+
+  renderTemplateTabs($("newTemplateTabs"), newIssueTemplates, newIssueTemplateIndex, (idx) => {
+    // save current text to current template before switching
+    newIssueTemplates[newIssueTemplateIndex] = $("newTemplateText").value;
+    newIssueTemplateIndex = idx;
+    $("newTemplateText").value = newIssueTemplates[newIssueTemplateIndex] || "";
+    renderNewTemplates();
+  });
+
+  $("newTemplateText").value = newIssueTemplates[newIssueTemplateIndex] || "";
+}
+
+function addNewIssueTemplate() {
+  // save current template text first
+  newIssueTemplates[newIssueTemplateIndex] = $("newTemplateText").value;
+  newIssueTemplates.push(`Subject: \n\nHi there,\n\n\nRegards,`);
+  newIssueTemplateIndex = newIssueTemplates.length - 1;
+  renderNewTemplates();
+}
+
+function resetNewForm() {
+  $("newIssueForm").reset();
+  newIssueTemplates = [...DEFAULT_TEMPLATES];
+  newIssueTemplateIndex = 0;
+  renderNewTemplates();
+
+  // Keep applications placeholder selection
+  renderApplications($("applicationSelect"), "");
+}
+
+function saveNewIssue(e) {
+  e.preventDefault();
+
+  // save current template text into array
+  newIssueTemplates[newIssueTemplateIndex] = $("newTemplateText").value;
+
+  const issueDescription = $("issueDescription").value.trim();
+  const application = $("applicationSelect").value;
+  const rootCause = $("rootCause").value.trim();
+  const checklist = parseChecklist($("checklists").value);
+  const zendeskTicket = $("zendeskTicket").value.trim();
+  const solution = $("solution").value.trim();
+
+  const newIssue = {
+    id: makeId(),
+    issueDescription,
+    application,
+    rootCause,
+    checklist,
+    zendeskTicket,
+    solution,
+    templates: newIssueTemplates.map(t => t ?? ""),
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  };
+
+  issues.push(newIssue);
+  saveIssues();
+
+  // Switch to common issues + select the new one
+  selectedIssueId = newIssue.id;
+  commonSearch = "";
+  $("searchInput").value = "";
+
+  setTab("common");
+  renderIssueList();
+  renderIssueDetailsView();
+
+  // Reset form for next entry
+  resetNewForm();
+
+  // scroll to top of details on mobile
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
 function init() {
-  wireTopTabs();
+  issues = loadIssues();
+  applications = loadApps();
 
-  fillApplicationSelect();
-  wireAddApplication();
+  // Tabs
+  $("tabCommonBtn").addEventListener("click", () => setTab("common"));
+  $("tabNewBtn").addEventListener("click", () => setTab("new"));
 
-  ensureDefaultTemplates();
-  renderTemplateTabs();
-  syncTemplateEditor();
-  wireTemplateControls();
+  // Search filter
+  $("searchInput").addEventListener("input", (e) => {
+    commonSearch = e.target.value.trim();
+    renderIssueList();
+    // keep details as-is
+  });
 
-  wireForm();
-  renderIssues();
+  // New Issues form
+  renderApplications($("applicationSelect"), "");
+  $("addAppBtn").addEventListener("click", () => promptAddApplication($("applicationSelect")));
+  $("addTemplateBtn").addEventListener("click", addNewIssueTemplate);
+  $("resetBtn").addEventListener("click", resetNewForm);
+  $("newIssueForm").addEventListener("submit", saveNewIssue);
+
+  // Common details actions
+  $("editIssueBtn").addEventListener("click", enterEditMode);
+  $("deleteIssueBtn").addEventListener("click", deleteSelectedIssue);
+
+  // Edit form actions
+  $("issueEditForm").addEventListener("submit", saveEditedIssue);
+  $("cancelEditBtn").addEventListener("click", () => {
+    showEditForm(false);
+    showDetailsView(true);
+    cancelEdit();
+  });
+  $("editAddAppBtn").addEventListener("click", () => promptAddApplication($("editApplicationSelect")));
+  $("editAddTemplateBtn").addEventListener("click", () => {
+    const issue = issues.find(i => i.id === selectedIssueId);
+    if (!issue) return;
+
+    // save current template text
+    if (Array.isArray(issue.templates) && issue.templates.length > 0) {
+      issue.templates[editIssueTemplateIndex] = $("editTemplateText").value;
+    }
+    addNewTemplateToSelectedIssue();
+  });
+
+  // when typing in edit template textarea, update current template live
+  $("editTemplateText").addEventListener("input", () => {
+    const issue = issues.find(i => i.id === selectedIssueId);
+    if (!issue || !Array.isArray(issue.templates)) return;
+    issue.templates[editIssueTemplateIndex] = $("editTemplateText").value;
+  });
+
+  // Initial render
+  setTab("common");
+  ensureSelectedIssueStillExists();
+  renderNewTemplates();
+  renderIssueList();
+  renderIssueDetailsView();
 }
 
-document.addEventListener("DOMContentLoaded", init);
+init();
