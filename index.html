@@ -4,28 +4,26 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Troubleshooting Checklist Portal</title>
-  <link rel="stylesheet" href="style.css"/>
+  <link rel="stylesheet" href="style.css" />
 </head>
+
 <body>
-  <header class="site-header">
-    <div class="header-inner">
-      <h1>Troubleshooting Checklist Portal</h1>
-      <p>Internal Support &amp; Investigation Guide</p>
-    </div>
+  <header>
+    <h1>Troubleshooting Checklist Portal</h1>
+    <p>Internal Support & Investigation Guide</p>
   </header>
 
   <main class="page">
-    <!-- Top tabs -->
+    <!-- Tabs -->
     <div class="top-tabs">
-      <button class="tab-btn active" id="tabCommonBtn" type="button">Common Issues</button>
-      <button class="tab-btn" id="tabNewBtn" type="button">New Issues</button>
+      <button id="tabCommon" class="tab-btn active" type="button">Common Issues</button>
+      <button id="tabNew" class="tab-btn" type="button">New Issues</button>
     </div>
 
-    <!-- Search (filters Common Issues list) -->
-    <div class="search-row">
+    <!-- Search -->
+    <div class="search-container">
       <input
         id="searchInput"
-        class="search-input"
         type="text"
         placeholder="Search issues (ex: 409, Azure AD, Okta)..."
         autocomplete="off"
@@ -33,229 +31,135 @@
     </div>
 
     <!-- COMMON ISSUES -->
-    <section id="commonView" class="view">
-      <div class="section-title">
-        <h2>Common Issues</h2>
-        <p class="muted">Saved issues will appear here. Use search above to filter.</p>
-      </div>
+    <section id="commonSection" class="section active">
+      <h2>Common Issues</h2>
+      <p class="subtext">Saved issues will appear here. Use search above to filter.</p>
 
-      <div class="two-col">
-        <!-- Left: list of titles only -->
-        <div class="card list-card">
-          <div class="card-head">
-            <h3 class="card-title">Issues</h3>
-            <span class="pill muted-pill" id="issuesCountPill">0</span>
+      <div class="common-layout">
+        <!-- Left: title-only list -->
+        <div class="issue-list" id="issueList"></div>
+
+        <!-- Right: details panel -->
+        <div class="issue-details-panel" id="issueDetailsPanel">
+          <div class="placeholder">
+            Select an issue to view details.
           </div>
-
-          <ul id="issueList" class="issue-list">
-            <!-- JS renders list items -->
-          </ul>
-
-          <div id="emptyState" class="empty-state hidden">
-            <p class="muted">No issues yet. Go to <b>New Issues</b> and save one.</p>
-          </div>
-        </div>
-
-        <!-- Right: details panel (same look/width style as new issues form card) -->
-        <div class="card details-card">
-          <div class="card-head">
-            <h3 class="card-title">Issue details</h3>
-            <div class="card-actions">
-              <button id="editIssueBtn" class="btn btn-secondary" type="button" disabled>Edit</button>
-              <button id="deleteIssueBtn" class="btn btn-danger" type="button" disabled>Delete</button>
-            </div>
-          </div>
-
-          <div id="detailsPlaceholder" class="details-placeholder">
-            <p class="muted">Click an issue title on the left to view details here.</p>
-          </div>
-
-          <!-- View mode -->
-          <div id="issueDetailsView" class="hidden">
-            <div class="issue-title-row">
-              <h3 id="viewTitle" class="big-title"></h3>
-              <span id="viewAppPill" class="pill"></span>
-            </div>
-
-            <div class="kv">
-              <div class="kv-row">
-                <div class="kv-key">Root cause</div>
-                <div class="kv-val" id="viewRootCause"></div>
-              </div>
-
-              <div class="kv-row">
-                <div class="kv-key">Checklist</div>
-                <div class="kv-val">
-                  <ul id="viewChecklist" class="bullet-list"></ul>
-                </div>
-              </div>
-
-              <div class="kv-row">
-                <div class="kv-key">Zendesk ticket</div>
-                <div class="kv-val">
-                  <a id="viewZendesk" href="#" target="_blank" rel="noreferrer" class="link">Open link</a>
-                </div>
-              </div>
-
-              <div class="kv-row">
-                <div class="kv-key">Solution</div>
-                <div class="kv-val prewrap" id="viewSolution"></div>
-              </div>
-
-              <div class="kv-row">
-                <div class="kv-key">Email templates</div>
-                <div class="kv-val">
-                  <div class="template-tabs" id="viewTemplateTabs"></div>
-                  <div class="template-box">
-                    <pre id="viewTemplateText" class="template-pre"></pre>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Edit mode -->
-          <form id="issueEditForm" class="hidden">
-            <div class="form-grid">
-              <div class="form-row">
-                <label for="editIssueDescription">Issue Description</label>
-                <input id="editIssueDescription" type="text" placeholder='Example: "409 Error"' />
-              </div>
-
-              <div class="form-row">
-                <label>Application</label>
-                <div class="inline-row">
-                  <select id="editApplicationSelect"></select>
-                  <button id="editAddAppBtn" type="button" class="btn btn-secondary small">+ Add new application</button>
-                </div>
-                <div class="hint">Choose from the list or add a new one.</div>
-              </div>
-
-              <div class="form-row">
-                <label for="editRootCause">Root Cause</label>
-                <input id="editRootCause" type="text" placeholder='Example: "Server Misconfiguration"' />
-              </div>
-
-              <div class="form-row">
-                <label for="editChecklist">Checklists (one per line)</label>
-                <textarea id="editChecklist" rows="6" placeholder="Write one checklist item per line"></textarea>
-                <div class="hint">One line = one bullet point.</div>
-              </div>
-
-              <div class="form-row">
-                <label for="editZendesk">Zendesk Ticket Link</label>
-                <input id="editZendesk" type="url" placeholder="https://zendesk-link" />
-              </div>
-
-              <div class="form-row">
-                <label for="editSolution">Solution (detailed)</label>
-                <textarea id="editSolution" rows="5" placeholder="Write the solution details here..."></textarea>
-              </div>
-
-              <div class="form-row">
-                <div class="row-between">
-                  <label>Email Templates</label>
-                  <button id="editAddTemplateBtn" type="button" class="btn btn-secondary small">+ Add template</button>
-                </div>
-
-                <div class="template-tabs" id="editTemplateTabs"></div>
-
-                <textarea
-                  id="editTemplateText"
-                  class="template-editor"
-                  rows="8"
-                  placeholder="Write the email template text here..."
-                ></textarea>
-
-                <div class="hint">You can switch templates using the tabs above, and edit each one.</div>
-              </div>
-            </div>
-
-            <div class="form-actions">
-              <button id="saveEditBtn" class="btn btn-primary" type="submit">Save changes</button>
-              <button id="cancelEditBtn" class="btn btn-secondary" type="button">Cancel</button>
-            </div>
-          </form>
         </div>
       </div>
     </section>
 
     <!-- NEW ISSUES -->
-    <section id="newView" class="view hidden">
-      <div class="section-title">
-        <h2>Add New Issue Checklist</h2>
-        <p class="muted">Fill the form, then click <b>Save</b>. It will show up in <b>Common Issues</b>.</p>
-      </div>
+    <section id="newSection" class="section">
+      <h2>Add New Issue Checklist</h2>
+      <p class="subtext">Fill the form, then click Save. It will show up in Common Issues.</p>
 
       <div class="card form-card">
-        <form id="newIssueForm">
-          <div class="form-grid">
-            <div class="form-row">
-              <label for="issueDescription">Issue Description</label>
-              <input id="issueDescription" type="text" placeholder='Example: "409 Error"' required />
-            </div>
-
-            <div class="form-row">
-              <label>Application</label>
-              <div class="inline-row">
-                <select id="applicationSelect" required></select>
-                <button id="addAppBtn" type="button" class="btn btn-secondary small">+ Add new application</button>
-              </div>
-              <div class="hint">Choose from the list or add a new one.</div>
-            </div>
-
-            <div class="form-row">
-              <label for="rootCause">Root Cause</label>
-              <input id="rootCause" type="text" placeholder='Example: "Server Misconfiguration"' required />
-            </div>
-
-            <div class="form-row">
-              <label for="checklists">Checklists (one per line)</label>
-              <textarea id="checklists" rows="6" placeholder="Write one checklist item per line" required></textarea>
-              <div class="hint">One line = one bullet point.</div>
-            </div>
-
-            <div class="form-row">
-              <label for="zendeskTicket">Zendesk Ticket Link</label>
-              <input id="zendeskTicket" type="url" placeholder="https://zendesk-link" />
-            </div>
-
-            <div class="form-row">
-              <label for="solution">Solution (detailed)</label>
-              <textarea id="solution" rows="5" placeholder="Write the solution details here..." required></textarea>
-            </div>
-
-            <div class="form-row">
-              <div class="row-between">
-                <label>Email Templates</label>
-                <button id="addTemplateBtn" type="button" class="btn btn-secondary small">+ Add template</button>
-              </div>
-
-              <div class="template-tabs" id="newTemplateTabs"></div>
-
-              <textarea
-                id="newTemplateText"
-                class="template-editor"
-                rows="8"
-                placeholder="Write the email template text here..."
-              ></textarea>
-
-              <div class="hint">Switch templates with the tabs. Add more templates if needed.</div>
-            </div>
+        <div class="form-grid">
+          <div class="form-row">
+            <label for="issueDescription">Issue Description</label>
+            <input id="issueDescription" type="text" placeholder='Example: "409 Error"' />
           </div>
 
-          <div class="form-actions">
-            <button class="btn btn-primary" type="submit">Save</button>
-            <button id="resetBtn" class="btn btn-secondary" type="button">Reset</button>
+          <div class="form-row">
+            <label>Application</label>
+            <div class="app-row">
+              <select id="applicationSelect">
+                <option value="">Select application</option>
+              </select>
+              <button id="addNewAppBtn" type="button" class="secondary-btn">+ Add new application</button>
+            </div>
+            <small class="hint">Choose from the list or add a new one.</small>
           </div>
-        </form>
+
+          <div class="form-row">
+            <label for="rootCause">Root Cause</label>
+            <input id="rootCause" type="text" placeholder='Example: "Server Misconfiguration"' />
+          </div>
+
+          <div class="form-row">
+            <label for="checklists">Checklists (bullet points)</label>
+            <textarea id="checklists" rows="6" placeholder="Write one checklist item per line&#10;Example:&#10;Check server settings&#10;Review application logs"></textarea>
+            <small class="hint">One line = one bullet point.</small>
+          </div>
+
+          <div class="form-row">
+            <label for="zendeskLink">Zendesk Ticket Link</label>
+            <input id="zendeskLink" type="url" placeholder="https://your-zendesk-link" />
+          </div>
+
+          <div class="form-row">
+            <label for="solution">Solution</label>
+            <textarea id="solution" rows="5" placeholder="Write the solution in detail..."></textarea>
+          </div>
+
+          <div class="form-row">
+            <label>Ready-Made Email Templates</label>
+
+            <div class="template-tabs" id="templateTabs"></div>
+
+            <textarea id="templateEditor" rows="8" placeholder="Template content..."></textarea>
+
+            <div class="template-actions">
+              <button id="addTemplateBtn" type="button" class="secondary-btn">+ Add template</button>
+              <small class="hint">You can edit the template text before saving.</small>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button id="saveIssueBtn" type="button" class="primary-btn">Save</button>
+          <button id="resetIssueBtn" type="button" class="secondary-btn">Reset</button>
+        </div>
       </div>
     </section>
   </main>
 
-  <footer class="site-footer">
+  <footer>
     Internal Use Only | Troubleshooting Portal
   </footer>
+
+  <!-- Firebase (Firestore) -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
+    import {
+      getFirestore,
+      collection,
+      addDoc,
+      getDocs,
+      doc,
+      updateDoc,
+      deleteDoc,
+      serverTimestamp,
+      query,
+      orderBy
+    } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyC7hu52JLlf9_IA0UA10RaIRiWaoWhIpr8",
+      authDomain: "troubleshooting-hub.firebaseapp.com",
+      projectId: "troubleshooting-hub",
+      storageBucket: "troubleshooting-hub.firebasestorage.app",
+      messagingSenderId: "725774852364",
+      appId: "1:725774852364:web:5c16dcaffa96a5b7ab6929"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // Make Firestore usable from script.js (non-module)
+    window.db = db;
+    window.firebaseFns = {
+      collection,
+      addDoc,
+      getDocs,
+      doc,
+      updateDoc,
+      deleteDoc,
+      serverTimestamp,
+      query,
+      orderBy
+    };
+  </script>
 
   <script src="script.js"></script>
 </body>
