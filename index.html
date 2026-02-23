@@ -14,13 +14,12 @@
   </header>
 
   <main class="page">
-    <!-- Tabs -->
+
     <div class="top-tabs">
       <button id="tabCommon" class="tab-btn active" type="button">Common Issues</button>
       <button id="tabNew" class="tab-btn" type="button">New Issues</button>
     </div>
 
-    <!-- Search -->
     <div class="search-container">
       <input
         id="searchInput"
@@ -36,10 +35,8 @@
       <p class="subtext">Saved issues will appear here. Use search above to filter.</p>
 
       <div class="common-layout">
-        <!-- Left: title-only list -->
         <div class="issue-list" id="issueList"></div>
 
-        <!-- Right: details panel -->
         <div class="issue-details-panel" id="issueDetailsPanel">
           <div class="placeholder">
             Select an issue to view details.
@@ -55,6 +52,7 @@
 
       <div class="card form-card">
         <div class="form-grid">
+
           <div class="form-row">
             <label for="issueDescription">Issue Description</label>
             <input id="issueDescription" type="text" placeholder='Example: "409 Error"' />
@@ -66,59 +64,64 @@
               <select id="applicationSelect">
                 <option value="">Select application</option>
               </select>
-              <button id="addNewAppBtn" type="button" class="secondary-btn">+ Add new application</button>
+              <button id="addNewAppBtn" type="button" class="secondary-btn">
+                + Add new application
+              </button>
             </div>
             <small class="hint">Choose from the list or add a new one.</small>
           </div>
 
           <div class="form-row">
             <label for="rootCause">Root Cause</label>
-            <input id="rootCause" type="text" placeholder='Example: "Server Misconfiguration"' />
+            <input id="rootCause" type="text" />
           </div>
 
           <div class="form-row">
             <label for="checklists">Checklists (bullet points)</label>
-            <textarea id="checklists" rows="6" placeholder="Write one checklist item per line&#10;Example:&#10;Check server settings&#10;Review application logs"></textarea>
+            <textarea id="checklists" rows="6"></textarea>
             <small class="hint">One line = one bullet point.</small>
           </div>
 
           <div class="form-row">
             <label for="zendeskLink">Zendesk Ticket Link</label>
-            <input id="zendeskLink" type="url" placeholder="https://your-zendesk-link" />
+            <input id="zendeskLink" type="url" />
           </div>
 
           <div class="form-row">
             <label for="solution">Solution</label>
-            <textarea id="solution" rows="5" placeholder="Write the solution in detail..."></textarea>
+            <textarea id="solution" rows="5"></textarea>
           </div>
 
           <div class="form-row">
             <label>Ready-Made Email Templates</label>
-
             <div class="template-tabs" id="templateTabs"></div>
-
-            <textarea id="templateEditor" rows="8" placeholder="Template content..."></textarea>
+            <textarea id="templateEditor" rows="8"></textarea>
 
             <div class="template-actions">
-              <button id="addTemplateBtn" type="button" class="secondary-btn">+ Add template</button>
+              <button id="addTemplateBtn" type="button" class="secondary-btn">
+                + Add template
+              </button>
               <small class="hint">You can edit the template text before saving.</small>
             </div>
           </div>
+
         </div>
 
         <div class="form-actions">
           <button id="saveIssueBtn" type="button" class="primary-btn">Save</button>
           <button id="resetIssueBtn" type="button" class="secondary-btn">Reset</button>
         </div>
+
       </div>
     </section>
+
   </main>
 
   <footer>
     Internal Use Only | Troubleshooting Portal
   </footer>
 
-  <!-- Firebase (Firestore) -->
+  <!-- Firebase Setup -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
     import {
@@ -146,7 +149,7 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
-    // Make Firestore usable from script.js (non-module)
+    // Make Firebase available globally
     window.db = db;
     window.firebaseFns = {
       collection,
@@ -159,8 +162,12 @@
       query,
       orderBy
     };
+
+    // IMPORTANT: Load script.js only after Firebase is ready
+    const s = document.createElement("script");
+    s.src = "script.js?v=2";
+    document.body.appendChild(s);
   </script>
 
-  <script src="script.js"></script>
 </body>
 </html>
