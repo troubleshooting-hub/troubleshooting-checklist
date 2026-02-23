@@ -408,7 +408,7 @@ function renderSelectedIssueDetails() {
         </div>
 
         <div class="form-row">
-          <label>Zendesk Ticket Link</label>
+          <label>Reference Zendesk Ticket Link</label>
           <input id="editZendesk" type="url" value="${escapeHtml(it.zendeskLink || "")}" />
         </div>
 
