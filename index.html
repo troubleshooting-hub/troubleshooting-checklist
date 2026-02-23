@@ -2,108 +2,138 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Troubleshooting Checklist Portal</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Troubleshooting Checklist</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 
 <body>
   <header class="site-header">
-    <div class="header-inner">
-      <h1>Troubleshooting Checklist Portal</h1>
-      <p>Internal Support & Investigation Guide</p>
-    </div>
+    <h1>Troubleshooting Checklist Portal</h1>
+    <p>Internal Support &amp; Investigation Guide</p>
   </header>
 
-  <nav class="top-nav">
-    <div class="nav-inner">
-      <button class="tab-btn active" data-tab="common">Common Issues</button>
-      <button class="tab-btn" data-tab="new">New Issue</button>
-    </div>
-  </nav>
-
   <main class="container">
+    <!-- Top Tabs -->
+    <div class="top-tabs" role="tablist" aria-label="Main tabs">
+      <button class="tab-btn active" data-tab="common" role="tab" aria-selected="true">Common Issues</button>
+      <button class="tab-btn" data-tab="new" role="tab" aria-selected="false">New Issues</button>
+    </div>
+
+    <!-- Search -->
+    <div class="search-container">
+      <input
+        type="text"
+        id="searchInput"
+        placeholder="Search issues (ex: 409, Azure AD, Okta)..."
+        onkeyup="searchContent()"
+      />
+    </div>
 
     <!-- COMMON ISSUES TAB -->
-    <section id="tab-common" class="tab-section">
-      <div class="section-header">
-        <div>
-          <h2>Common Issues</h2>
-          <p class="muted">Issues saved from the “New Issue” tab will appear here automatically.</p>
-        </div>
-        <div class="section-actions">
-          <button id="clearAllBtn" class="btn btn-ghost" type="button">Clear All</button>
-        </div>
+    <section id="tab-common" class="tab-panel active" role="tabpanel">
+      <div class="panel-header">
+        <h2>Common Issues</h2>
+        <p>Saved issues will appear here. Use search above to filter.</p>
       </div>
 
       <div id="issuesEmptyState" class="empty-state">
-        <h3>No issues yet</h3>
-        <p>Add your first issue using the “New Issue” tab.</p>
+        No issues saved yet. Go to <strong>New Issues</strong> and click <strong>Save</strong>.
       </div>
 
       <div id="issuesList" class="issues-grid"></div>
     </section>
 
-    <!-- NEW ISSUE TAB -->
-    <section id="tab-new" class="tab-section hidden">
-      <div class="section-header">
-        <div>
-          <h2>New Issue</h2>
-          <p class="muted">Fill this form and click “Save”. The issue will show up in “Common Issues”.</p>
+    <!-- NEW ISSUES TAB -->
+    <section id="tab-new" class="tab-panel" role="tabpanel">
+      <div class="panel-header">
+        <h2>Add New Issue Checklist</h2>
+        <p>Fill the form, then click <strong>Save</strong>. It will show up in <strong>Common Issues</strong>.</p>
+      </div>
+
+      <form id="issueForm" class="form-card">
+        <!-- 1) Issue -->
+        <div class="form-group">
+          <label for="issueDescription">Issue Description</label>
+          <input id="issueDescription" type="text" placeholder='Example: "409 Error"' required />
         </div>
-      </div>
 
-      <div class="card form-card">
-        <form id="issueForm" autocomplete="off">
+        <!-- 2) Application (Dropdown + Add new) -->
+        <div class="form-group">
+          <label for="applicationSelect">Application</label>
 
-          <div class="form-row">
-            <label for="issueDescription">Issue Description</label>
-            <input id="issueDescription" type="text" placeholder='Example: "409 Error"' required />
+          <div class="inline-row">
+            <select id="applicationSelect" required></select>
+            <button type="button" class="ghost-btn" id="addAppBtn">+ Add new application</button>
           </div>
 
-          <div class="form-row">
-            <label for="rootCause">Root Cause</label>
-            <input id="rootCause" type="text" placeholder='Example: "Server Misconfiguration"' required />
+          <div id="addAppRow" class="inline-row hidden">
+            <input id="newAppName" type="text" placeholder="Enter application name (ex: BambooHR)" />
+            <button type="button" class="primary-btn small" id="saveAppBtn">Add</button>
+            <button type="button" class="ghost-btn small" id="cancelAppBtn">Cancel</button>
           </div>
 
-          <div class="form-row">
-            <label for="checklists">Checklists (bullet points)</label>
-            <textarea id="checklists" rows="5" placeholder="Write one checklist item per line&#10;Example:&#10;Check server settings&#10;Review application logs" required></textarea>
-            <div class="hint">Tip: Press Enter for a new checklist bullet.</div>
+          <div class="hint">Choose from the list or add a new one.</div>
+        </div>
+
+        <!-- Root Cause -->
+        <div class="form-group">
+          <label for="rootCause">Root Cause</label>
+          <input id="rootCause" type="text" placeholder='Example: "Server Misconfiguration"' />
+        </div>
+
+        <!-- Checklists -->
+        <div class="form-group">
+          <label for="checklists">Checklists (bullet points)</label>
+          <textarea
+            id="checklists"
+            rows="6"
+            placeholder="Write one checklist item per line&#10;Example:&#10;Check server settings&#10;Review application logs"
+          ></textarea>
+          <div class="hint">One line = one bullet point.</div>
+        </div>
+
+        <!-- Zendesk Link -->
+        <div class="form-group">
+          <label for="zendeskLink">Zendesk Ticket Link</label>
+          <input id="zendeskLink" type="url" placeholder="https://your-zendesk-link" />
+        </div>
+
+        <!-- Solution -->
+        <div class="form-group">
+          <label for="solution">Solution</label>
+          <textarea
+            id="solution"
+            rows="5"
+            placeholder="Write a clear solution with steps, if needed."
+          ></textarea>
+        </div>
+
+        <!-- Templates -->
+        <div class="form-group">
+          <label>Ready-Made Email Templates</label>
+
+          <div class="template-tabs">
+            <div id="templateTabBar" class="template-tabbar"></div>
+            <button type="button" class="ghost-btn" id="addTemplateBtn">+ Add template</button>
           </div>
 
-          <div class="form-row">
-            <label for="zendeskLink">Zendesk Ticket Link</label>
-            <input id="zendeskLink" type="url" placeholder="https://your-zendesk-link" />
-          </div>
+          <textarea
+            id="templateEditor"
+            rows="8"
+            placeholder="Template content..."
+          ></textarea>
 
-          <div class="form-row">
-            <label for="solution">Solution</label>
-            <textarea id="solution" rows="6" placeholder="Write the solution in detail..." required></textarea>
-          </div>
+          <div class="hint">You can switch templates using the tabs above.</div>
+        </div>
 
-          <div class="form-row">
-            <label for="templateSelect">Ready-Made Email Template</label>
-            <select id="templateSelect">
-              <option value="template1">Template 1 (Short)</option>
-              <option value="template2">Template 2 (Detailed)</option>
-              <option value="template3">Template 3 (Customer-friendly)</option>
-            </select>
-
-            <textarea id="templateText" rows="7" placeholder="Template text will appear here..."></textarea>
-            <div class="hint">You can edit the template text before saving.</div>
-          </div>
-
-          <div class="form-actions">
-            <button id="saveBtn" class="btn btn-primary" type="submit">Save</button>
-            <button id="resetBtn" class="btn btn-ghost" type="button">Reset</button>
-          </div>
-
-        </form>
-      </div>
-
+        <!-- Actions -->
+        <div class="actions">
+          <button type="submit" class="primary-btn">Save</button>
+          <button type="button" class="ghost-btn" id="resetBtn">Reset</button>
+        </div>
+      </form>
     </section>
-
   </main>
 
   <footer class="site-footer">

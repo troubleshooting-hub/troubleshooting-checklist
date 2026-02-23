@@ -1,48 +1,65 @@
-// Storage key (this is where the issues are saved in your browser)
+// -----------------------------
+// Simple storage (localStorage)
+// -----------------------------
 const STORAGE_KEY = "troubleshooting_issues_v1";
 
-// Templates (user can choose 1/2/3, and also edit before saving)
-const EMAIL_TEMPLATES = {
-  template1: `Subject: Update on your issue
+// -----------------------------
+// App list (defaults)
+// -----------------------------
+const DEFAULT_APPS = [
+  "Active Directory",
+  "Azure AD",
+  "Okta",
+  "ADP",
+  "Paycor",
+  "Dayforce",
+  "Paylocity"
+];
+
+// -----------------------------
+// Template defaults
+// -----------------------------
+const DEFAULT_TEMPLATES = [
+`Subject: Update on your issue
 
 Hi there,
 
 Thanks for your patience. We investigated the issue and have identified the cause.
 We are applying the fix now and will confirm once everything is stable.
 
-Regards,
-Support Team`,
-  template2: `Subject: Detailed update on your issue
+Regards,`,
+`Subject: We found the cause and next steps
 
 Hi there,
 
-Here is the update:
+We’ve identified the root cause and are taking the next steps listed below.
+If you need anything urgently, reply to this email and we’ll prioritize.
 
-• Issue: {{ISSUE}}
-• Root cause: {{ROOT_CAUSE}}
-• Solution: {{SOLUTION}}
-
-If you have any questions, reply to this email and we’ll help.
-
-Regards,
-Support Team`,
-  template3: `Subject: Resolution update
+Regards,`,
+`Subject: Issue resolved
 
 Hi there,
 
-We found what caused the problem and fixed it.  
-If you still notice the issue, please share a new example and we will re-check.
+The issue has been resolved and we’re monitoring to ensure it stays stable.
+If you notice the same problem again, please reply with the time it happened.
 
-Regards,
-Support Team`
-};
+Regards,`
+];
 
-// ---------- Helpers ----------
+// -----------------------------
+// State for "New Issues" form
+// -----------------------------
+let formTemplates = [];        // array of strings
+let activeTemplateIndex = 0;
+
+// -----------------------------
+// Helpers
+// -----------------------------
 function loadIssues() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     return raw ? JSON.parse(raw) : [];
-  } catch {
+  } catch (e) {
     return [];
   }
 }
@@ -51,38 +68,234 @@ function saveIssues(issues) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(issues));
 }
 
-function escapeHtml(text) {
-  const div = document.createElement("div");
-  div.innerText = text ?? "";
-  return div.innerHTML;
+function uid() {
+  return Math.random().toString(16).slice(2) + Date.now().toString(16);
 }
 
-function checklistLinesToArray(text) {
-  return (text || "")
+function escapeHtml(str) {
+  return String(str || "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function linesToBullets(text) {
+  return String(text || "")
     .split("\n")
-    .map(line => line.trim())
+    .map(s => s.trim())
     .filter(Boolean);
 }
 
-function formatDate(ts) {
-  const d = new Date(ts);
-  return d.toLocaleString();
+// -----------------------------
+// Tabs
+// -----------------------------
+function setActiveTab(tabName) {
+  document.querySelectorAll(".tab-btn").forEach(btn => {
+    const isActive = btn.dataset.tab === tabName;
+    btn.classList.toggle("active", isActive);
+    btn.setAttribute("aria-selected", isActive ? "true" : "false");
+  });
+
+  document.getElementById("tab-common").classList.toggle("active", tabName === "common");
+  document.getElementById("tab-new").classList.toggle("active", tabName === "new");
+
+  // Render common issues when switching there
+  if (tabName === "common") {
+    renderIssues();
+  }
 }
 
-// ---------- UI: Tabs ----------
-function showTab(tabName) {
-  const common = document.getElementById("tab-common");
-  const newer = document.getElementById("tab-new");
-
-  common.classList.toggle("hidden", tabName !== "common");
-  newer.classList.toggle("hidden", tabName !== "new");
-
+function wireTopTabs() {
   document.querySelectorAll(".tab-btn").forEach(btn => {
-    btn.classList.toggle("active", btn.dataset.tab === tabName);
+    btn.addEventListener("click", () => setActiveTab(btn.dataset.tab));
   });
 }
 
-// ---------- UI: Render Issues ----------
+// -----------------------------
+// Application dropdown + add new
+// -----------------------------
+function fillApplicationSelect() {
+  const sel = document.getElementById("applicationSelect");
+  sel.innerHTML = "";
+
+  // Add a placeholder option
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = "Select application";
+  placeholder.disabled = true;
+  placeholder.selected = true;
+  sel.appendChild(placeholder);
+
+  DEFAULT_APPS.forEach(app => {
+    const opt = document.createElement("option");
+    opt.value = app;
+    opt.textContent = app;
+    sel.appendChild(opt);
+  });
+}
+
+function wireAddApplication() {
+  const addBtn = document.getElementById("addAppBtn");
+  const row = document.getElementById("addAppRow");
+  const input = document.getElementById("newAppName");
+  const saveBtn = document.getElementById("saveAppBtn");
+  const cancelBtn = document.getElementById("cancelAppBtn");
+  const sel = document.getElementById("applicationSelect");
+
+  addBtn.addEventListener("click", () => {
+    row.classList.remove("hidden");
+    input.value = "";
+    input.focus();
+  });
+
+  cancelBtn.addEventListener("click", () => {
+    row.classList.add("hidden");
+    input.value = "";
+  });
+
+  saveBtn.addEventListener("click", () => {
+    const name = input.value.trim();
+    if (!name) return;
+
+    // Add to dropdown immediately (not to DEFAULT_APPS array)
+    const opt = document.createElement("option");
+    opt.value = name;
+    opt.textContent = name;
+    sel.appendChild(opt);
+
+    sel.value = name;
+    row.classList.add("hidden");
+    input.value = "";
+  });
+}
+
+// -----------------------------
+// Templates (tabs + add more)
+// -----------------------------
+function ensureDefaultTemplates() {
+  if (formTemplates.length === 0) {
+    formTemplates = [...DEFAULT_TEMPLATES];
+    activeTemplateIndex = 0;
+  }
+}
+
+function renderTemplateTabs() {
+  const bar = document.getElementById("templateTabBar");
+  bar.innerHTML = "";
+
+  formTemplates.forEach((_, idx) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "template-tab" + (idx === activeTemplateIndex ? " active" : "");
+    btn.textContent = `Template ${idx + 1}`;
+    btn.addEventListener("click", () => {
+      // Save current editor text into current template before switching
+      formTemplates[activeTemplateIndex] = document.getElementById("templateEditor").value;
+      activeTemplateIndex = idx;
+      syncTemplateEditor();
+      renderTemplateTabs();
+    });
+    bar.appendChild(btn);
+  });
+}
+
+function syncTemplateEditor() {
+  const editor = document.getElementById("templateEditor");
+  editor.value = formTemplates[activeTemplateIndex] || "";
+}
+
+function wireTemplateControls() {
+  const addBtn = document.getElementById("addTemplateBtn");
+  const editor = document.getElementById("templateEditor");
+
+  // Keep state updated as user types
+  editor.addEventListener("input", () => {
+    formTemplates[activeTemplateIndex] = editor.value;
+  });
+
+  addBtn.addEventListener("click", () => {
+    // Save current editor into current template first
+    formTemplates[activeTemplateIndex] = editor.value;
+
+    // Add a new empty template
+    formTemplates.push(`Subject: \n\nHi there,\n\n\nRegards,`);
+    activeTemplateIndex = formTemplates.length - 1;
+
+    renderTemplateTabs();
+    syncTemplateEditor();
+    editor.focus();
+  });
+}
+
+// -----------------------------
+// Save / Reset form
+// -----------------------------
+function wireForm() {
+  const form = document.getElementById("issueForm");
+  const resetBtn = document.getElementById("resetBtn");
+
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+
+    // Always capture latest editor text
+    formTemplates[activeTemplateIndex] = document.getElementById("templateEditor").value;
+
+    const issueDescription = document.getElementById("issueDescription").value.trim();
+    const application = document.getElementById("applicationSelect").value;
+    const rootCause = document.getElementById("rootCause").value.trim();
+    const checklistsText = document.getElementById("checklists").value;
+    const zendeskLink = document.getElementById("zendeskLink").value.trim();
+    const solution = document.getElementById("solution").value.trim();
+
+    if (!issueDescription) return;
+    if (!application) return;
+
+    const issue = {
+      id: uid(),
+      issueDescription,
+      application,
+      rootCause,
+      checklists: linesToBullets(checklistsText),
+      zendeskLink,
+      solution,
+      templates: formTemplates.filter(t => String(t).trim().length > 0)
+    };
+
+    const issues = loadIssues();
+    issues.unshift(issue); // newest first
+    saveIssues(issues);
+
+    // Reset form + go to Common Issues
+    resetForm();
+    setActiveTab("common");
+  });
+
+  resetBtn.addEventListener("click", () => resetForm());
+}
+
+function resetForm() {
+  document.getElementById("issueDescription").value = "";
+  document.getElementById("rootCause").value = "";
+  document.getElementById("checklists").value = "";
+  document.getElementById("zendeskLink").value = "";
+  document.getElementById("solution").value = "";
+
+  // Reset application select
+  const sel = document.getElementById("applicationSelect");
+  sel.value = "";
+
+  // Reset template state
+  formTemplates = [...DEFAULT_TEMPLATES];
+  activeTemplateIndex = 0;
+  renderTemplateTabs();
+  syncTemplateEditor();
+}
+
+// -----------------------------
+// Common Issues rendering
+// -----------------------------
 function renderIssues() {
   const issues = loadIssues();
   const list = document.getElementById("issuesList");
@@ -90,167 +303,138 @@ function renderIssues() {
 
   list.innerHTML = "";
 
-  if (!issues.length) {
-    empty.classList.remove("hidden");
-    return;
-  }
+  const query = (document.getElementById("searchInput").value || "").trim().toLowerCase();
 
-  empty.classList.add("hidden");
+  const filtered = issues.filter(issue => {
+    if (!query) return true;
 
-  // Latest first
-  const sorted = [...issues].sort((a, b) => b.createdAt - a.createdAt);
+    const haystack = [
+      issue.issueDescription,
+      issue.application,
+      issue.rootCause,
+      (issue.checklists || []).join(" "),
+      issue.solution,
+      issue.zendeskLink,
+      (issue.templates || []).join(" ")
+    ].join(" ").toLowerCase();
 
-  sorted.forEach(issue => {
+    return haystack.includes(query);
+  });
+
+  empty.style.display = filtered.length ? "none" : "block";
+
+  filtered.forEach(issue => {
     const card = document.createElement("div");
-    card.className = "card issue-card";
-
-    const checklistItems = (issue.checklists || [])
-      .map(item => `<li>${escapeHtml(item)}</li>`)
-      .join("");
-
-    const zendeskHtml = issue.zendeskLink
-      ? `<a href="${escapeHtml(issue.zendeskLink)}" target="_blank" rel="noopener noreferrer">Open Ticket</a>`
-      : `<span class="muted">Not provided</span>`;
+    card.className = "issue-card";
 
     card.innerHTML = `
-      <h3 class="issue-title">${escapeHtml(issue.issueDescription)}</h3>
-      <div class="issue-meta">Saved: ${escapeHtml(formatDate(issue.createdAt))}</div>
-
-      <div class="issue-block">
-        <h4>Root Cause</h4>
-        <p>${escapeHtml(issue.rootCause)}</p>
+      <div class="issue-title">
+        <h3>${escapeHtml(issue.issueDescription)}</h3>
+        <span class="badge">${escapeHtml(issue.application || "Unknown app")}</span>
       </div>
 
-      <div class="issue-block">
-        <h4>Checklists</h4>
-        <ul>${checklistItems}</ul>
+      ${issue.rootCause ? `<div class="issue-meta"><strong>Root cause:</strong> ${escapeHtml(issue.rootCause)}</div>` : ""}
+
+      <div class="issue-section">
+        <h4>Checklist</h4>
+        ${
+          (issue.checklists && issue.checklists.length)
+            ? `<ul>${issue.checklists.map(i => `<li>${escapeHtml(i)}</li>`).join("")}</ul>`
+            : `<p>No checklist added.</p>`
+        }
       </div>
 
-      <div class="issue-block">
-        <h4>Zendesk Ticket</h4>
-        <p>${zendeskHtml}</p>
+      <div class="issue-section">
+        <h4>Zendesk</h4>
+        ${
+          issue.zendeskLink
+            ? `<p class="issue-link"><a href="${escapeHtml(issue.zendeskLink)}" target="_blank" rel="noreferrer">Open ticket</a></p>`
+            : `<p>No ticket link.</p>`
+        }
       </div>
 
-      <div class="issue-block">
+      <div class="issue-section">
         <h4>Solution</h4>
-        <p>${escapeHtml(issue.solution)}</p>
+        <p>${issue.solution ? escapeHtml(issue.solution) : "No solution added."}</p>
       </div>
 
-      <div class="issue-block">
-        <h4>Email Template</h4>
-        <p style="white-space: pre-wrap;">${escapeHtml(issue.emailTemplateText)}</p>
-      </div>
-
-      <div class="issue-actions">
-        <button class="btn btn-ghost" data-delete-id="${escapeHtml(issue.id)}">Delete</button>
+      <div class="issue-section">
+        <h4>Email Templates</h4>
+        <div class="template-viewer" data-issue-id="${escapeHtml(issue.id)}">
+          <div class="template-tabbar" data-role="tabs"></div>
+          <div class="template-box" data-role="box"></div>
+        </div>
       </div>
     `;
 
     list.appendChild(card);
-  });
 
-  // Hook up delete buttons
-  list.querySelectorAll("[data-delete-id]").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const id = btn.getAttribute("data-delete-id");
-      const issuesNow = loadIssues();
-      const filtered = issuesNow.filter(x => x.id !== id);
-      saveIssues(filtered);
-      renderIssues();
+    // Build template tabs for this card
+    buildIssueTemplateViewer(issue);
+  });
+}
+
+function buildIssueTemplateViewer(issue) {
+  const viewer = document.querySelector(`.template-viewer[data-issue-id="${CSS.escape(issue.id)}"]`);
+  if (!viewer) return;
+
+  const tabsBar = viewer.querySelector('[data-role="tabs"]');
+  const box = viewer.querySelector('[data-role="box"]');
+
+  const templates = (issue.templates && issue.templates.length) ? issue.templates : ["No templates saved."];
+
+  let activeIdx = 0;
+
+  function renderTabs() {
+    tabsBar.innerHTML = "";
+    templates.forEach((_, idx) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "template-tab" + (idx === activeIdx ? " active" : "");
+      btn.textContent = `Template ${idx + 1}`;
+      btn.addEventListener("click", () => {
+        activeIdx = idx;
+        renderTabs();
+        renderBox();
+      });
+      tabsBar.appendChild(btn);
     });
-  });
-}
-
-// ---------- Form ----------
-function setTemplateTextFromSelect() {
-  const select = document.getElementById("templateSelect");
-  const area = document.getElementById("templateText");
-
-  const chosen = select.value;
-  const base = EMAIL_TEMPLATES[chosen] || "";
-  area.value = base;
-}
-
-function resetForm() {
-  document.getElementById("issueForm").reset();
-  setTemplateTextFromSelect();
-}
-
-function handleSave(e) {
-  e.preventDefault();
-
-  const issueDescription = document.getElementById("issueDescription").value.trim();
-  const rootCause = document.getElementById("rootCause").value.trim();
-  const checklistsRaw = document.getElementById("checklists").value;
-  const zendeskLink = document.getElementById("zendeskLink").value.trim();
-  const solution = document.getElementById("solution").value.trim();
-  const emailTemplateText = document.getElementById("templateText").value.trim();
-
-  const checklists = checklistLinesToArray(checklistsRaw);
-
-  // Simple checks (no complicated messages)
-  if (!issueDescription || !rootCause || !checklists.length || !solution || !emailTemplateText) {
-    alert("Please fill all required fields (including at least 1 checklist item).");
-    return;
   }
 
-  const newIssue = {
-    id: String(Date.now()) + "_" + Math.random().toString(16).slice(2),
-    createdAt: Date.now(),
-    issueDescription,
-    rootCause,
-    checklists,
-    zendeskLink,
-    solution,
-    emailTemplateText
-  };
+  function renderBox() {
+    box.textContent = templates[activeIdx] || "";
+  }
 
-  const issues = loadIssues();
-  issues.push(newIssue);
-  saveIssues(issues);
-
-  // Update the common issues view immediately
-  renderIssues();
-
-  // Move user to Common Issues so they can see it
-  showTab("common");
-
-  // Reset form for next entry
-  resetForm();
+  renderTabs();
+  renderBox();
 }
 
-// ---------- Clear all ----------
-function clearAllIssues() {
-  const ok = confirm("This will remove all saved issues. Continue?");
-  if (!ok) return;
+// -----------------------------
+// Search
+// -----------------------------
+function searchContent() {
+  // Only affects Common Issues list
+  if (document.getElementById("tab-common").classList.contains("active")) {
+    renderIssues();
+  }
+}
 
-  saveIssues([]);
+// -----------------------------
+// Init
+// -----------------------------
+function init() {
+  wireTopTabs();
+
+  fillApplicationSelect();
+  wireAddApplication();
+
+  ensureDefaultTemplates();
+  renderTemplateTabs();
+  syncTemplateEditor();
+  wireTemplateControls();
+
+  wireForm();
   renderIssues();
 }
 
-// ---------- Setup ----------
-document.addEventListener("DOMContentLoaded", () => {
-  // Tabs
-  document.querySelectorAll(".tab-btn").forEach(btn => {
-    btn.addEventListener("click", () => showTab(btn.dataset.tab));
-  });
-
-  // Template chooser
-  document.getElementById("templateSelect").addEventListener("change", setTemplateTextFromSelect);
-
-  // Form submit
-  document.getElementById("issueForm").addEventListener("submit", handleSave);
-
-  // Reset
-  document.getElementById("resetBtn").addEventListener("click", resetForm);
-
-  // Clear all
-  document.getElementById("clearAllBtn").addEventListener("click", clearAllIssues);
-
-  // Initial template + render issues
-  setTemplateTextFromSelect();
-  renderIssues();
-
-  // Default tab
-  showTab("common");
-});
+document.addEventListener("DOMContentLoaded", init);
