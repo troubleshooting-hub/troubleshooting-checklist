@@ -1,100 +1,45 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Troubleshooting Checklist</title>
-    <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Troubleshooting Checklist Portal</title>
+  <link rel="stylesheet" href="style.css" />
 </head>
 
 <body>
 
-<header>
+  <header>
     <h1>Troubleshooting Checklist Portal</h1>
     <p>Internal Support & Investigation Guide</p>
-</header>
+  </header>
 
-<nav>
-    <button onclick="showSection('start')">Start Here</button>
-    <button onclick="showSection('logs')">Logs</button>
-    <button onclick="showSection('tenant')">Tenant Checks</button>
-    <button onclick="showSection('issues')">Common Issues</button>
-    
-</nav>
+  <main>
+    <div class="dashboard-container">
 
-<div style="text-align:center; margin: 16px;">
-  <input 
-    type="text" 
-    id="searchInput" 
-    placeholder="Search troubleshooting topics..." 
-    style="padding:10px; width:280px; border-radius:8px; border:1px solid #ccc;"
-    onkeyup="searchContent()"
-  />
-</div>
+      <div class="dashboard-card">
+        <h2>Common Issues</h2>
+        <p>View existing troubleshooting checklists and known issue patterns.</p>
+        <button id="openIssuesBtn">
+          Open Common Issues
+        </button>
+      </div>
 
-<main>
+      <div class="dashboard-card">
+        <h2>Add New Issue Checklist</h2>
+        <p>Create a new troubleshooting checklist for recurring incidents.</p>
+        <button id="newIssueBtn">
+          Create New Checklist
+        </button>
+      </div>
 
-<section id="start" class="content">
-    <h2>Start Here</h2>
-    <ul>
-        <li>Identify the symptom.</li>
-        <li>Check Application Logs.</li>
-        <li>Check Integration Logs.</li>
-        <li>Verify Tenant Attributes.</li>
-        <li>Review recent changes.</li>
-    </ul>
-</section>
+    </div>
+  </main>
 
-<section id="logs" class="content hidden">
-    <h2>Logs Checklist</h2>
-    <h3>Application Logs</h3>
-    <ul>
-        <li>Check error codes</li>
-        <li>Look for failed API calls</li>
-        <li>Check timestamp consistency</li>
-    </ul>
+  <footer>
+    Internal Use Only | Troubleshooting Portal
+  </footer>
 
-    <h3>Integration Logs</h3>
-    <ul>
-        <li>Verify webhook triggers</li>
-        <li>Check payload structure</li>
-        <li>Validate authentication tokens</li>
-    </ul>
-</section>
-
-<section id="tenant" class="content hidden">
-    <h2>Tenant Attribute Checks</h2>
-    <ul>
-        <li>Verify required attributes exist</li>
-        <li>Check attribute mappings</li>
-        <li>Confirm correct environment (Prod/Sandbox)</li>
-        <li>Validate role/group assignments</li>
-    </ul>
-</section>
-
-<section id="issues" class="content hidden">
-    <h2>Common Issues</h2>
-
-    <h3>User Not Provisioning</h3>
-    <ul>
-        <li>Check if user exists in source system</li>
-        <li>Verify sync job executed</li>
-        <li>Check attribute mapping errors</li>
-    </ul>
-
-    <h3>Attribute Not Updating</h3>
-    <ul>
-        <li>Check last sync timestamp</li>
-        <li>Verify field mapping</li>
-        <li>Review transformation logic</li>
-    </ul>
-
-</section>
-
-</main>
-
-<footer>
-    <p>Internal Use Only | Troubleshooting Portal</p>
-</footer>
-
-<script src="script.js"></script>
+  <script src="script.js"></script>
 </body>
 </html>

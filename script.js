@@ -1,29 +1,14 @@
-function showSection(sectionId) {
-    let sections = document.querySelectorAll('.content');
-    sections.forEach(section => {
-        section.classList.add('hidden');
-    });
+document.addEventListener("DOMContentLoaded", function () {
 
-    document.getElementById(sectionId).classList.remove('hidden');
-}
-function searchContent() {
-  const input = document.getElementById("searchInput").value.toLowerCase();
-  const sections = document.querySelectorAll(".content");
+  const openIssuesBtn = document.getElementById("openIssuesBtn");
+  const newIssueBtn = document.getElementById("newIssueBtn");
 
-  // If search is empty, go back to normal view
-  if (input.trim() === "") {
-    sections.forEach(section => section.classList.add("hidden"));
-    document.getElementById("start").classList.remove("hidden");
-    return;
-  }
-
-  // If search has text, show sections that match
-  sections.forEach(section => {
-    const text = section.innerText.toLowerCase();
-    if (text.includes(input)) {
-      section.classList.remove("hidden");
-    } else {
-      section.classList.add("hidden");
-    }
+  openIssuesBtn.addEventListener("click", function () {
+    alert("Common Issues page coming next step.");
   });
-}
+
+  newIssueBtn.addEventListener("click", function () {
+    alert("New Issue Checklist form coming next step.");
+  });
+
+});
