@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Troubleshooting Checklist</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<header>
+    <h1>Troubleshooting Checklist Portal</h1>
+    <p>Internal Support & Investigation Guide</p>
+</header>
+
+<nav>
+    <button onclick="showSection('start')">Start Here</button>
+    <button onclick="showSection('logs')">Logs</button>
+    <button onclick="showSection('tenant')">Tenant Checks</button>
+    <button onclick="showSection('issues')">Common Issues</button>
+</nav>
+
+<main>
+
+<section id="start" class="content">
+    <h2>Start Here</h2>
+    <ul>
+        <li>Identify the symptom.</li>
+        <li>Check Application Logs.</li>
+        <li>Check Integration Logs.</li>
+        <li>Verify Tenant Attributes.</li>
+        <li>Review recent changes.</li>
+    </ul>
+</section>
+
+<section id="logs" class="content hidden">
+    <h2>Logs Checklist</h2>
+    <h3>Application Logs</h3>
+    <ul>
+        <li>Check error codes</li>
+        <li>Look for failed API calls</li>
+        <li>Check timestamp consistency</li>
+    </ul>
+
+    <h3>Integration Logs</h3>
+    <ul>
+        <li>Verify webhook triggers</li>
+        <li>Check payload structure</li>
+        <li>Validate authentication tokens</li>
+    </ul>
+</section>
+
+<section id="tenant" class="content hidden">
+    <h2>Tenant Attribute Checks</h2>
+    <ul>
+        <li>Verify required attributes exist</li>
+        <li>Check attribute mappings</li>
+        <li>Confirm correct environment (Prod/Sandbox)</li>
+        <li>Validate role/group assignments</li>
+    </ul>
+</section>
+
+<section id="issues" class="content hidden">
+    <h2>Common Issues</h2>
+
+    <h3>User Not Provisioning</h3>
+    <ul>
+        <li>Check if user exists in source system</li>
+        <li>Verify sync job executed</li>
+        <li>Check attribute mapping errors</li>
+    </ul>
+
+    <h3>Attribute Not Updating</h3>
+    <ul>
+        <li>Check last sync timestamp</li>
+        <li>Verify field mapping</li>
+        <li>Review transformation logic</li>
+    </ul>
+
+</section>
+
+</main>
+
+<footer>
+    <p>Internal Use Only | Troubleshooting Portal</p>
+</footer>
+
+<script src="script.js"></script>
+</body>
+</html>
