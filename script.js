@@ -1,7 +1,6 @@
 /* =========
    Helpers
 ========= */
-
 function escapeHtml(str = "") {
   return String(str)
     .replaceAll("&", "&amp;")
@@ -12,22 +11,21 @@ function escapeHtml(str = "") {
 }
 
 function linesToBullets(text = "") {
-  return text
+  return String(text)
     .split("\n")
     .map(s => s.trim())
     .filter(Boolean);
 }
 
 function bulletsToHtml(items = []) {
-  if (!items.length) return "<p class='muted'>No checklist items.</p>";
-  return `<ul class="bullets">${items.map(li => `<li>${escapeHtml(li)}</li>`).join("")}</ul>`;
+  if (!items.length) return "<div class='muted'>No checklist items.</div>";
+  return `<ul class="bullet-list">${items.map(li => `<li>${escapeHtml(li)}</li>`).join("")}</ul>`;
 }
 
 function safeUrl(url) {
   const u = (url || "").trim();
   if (!u) return "";
   try {
-    // basic validation
     new URL(u);
     return u;
   } catch {
@@ -38,7 +36,6 @@ function safeUrl(url) {
 /* =========
    App State
 ========= */
-
 const DEFAULT_APPS = [
   "Active Directory",
   "Azure AD",
@@ -92,14 +89,15 @@ Regards,`
   }
 ];
 
-let issues = [];            // loaded from Firestore
-let selectedIssueId = null; // Firestore doc id
+let issues = [];
+let selectedIssueId = null;
+
+let templateState = structuredClone(DEFAULT_TEMPLATES);
 let selectedTemplateIndex = 0;
 
 /* =========
    DOM
 ========= */
-
 const tabCommon = document.getElementById("tabCommon");
 const tabNew = document.getElementById("tabNew");
 const commonSection = document.getElementById("commonSection");
@@ -108,6 +106,7 @@ const newSection = document.getElementById("newSection");
 const searchInput = document.getElementById("searchInput");
 const issueList = document.getElementById("issueList");
 const issueDetailsPanel = document.getElementById("issueDetailsPanel");
+const issueCountPill = document.getElementById("issueCountPill");
 
 // Form
 const issueDescription = document.getElementById("issueDescription");
@@ -126,64 +125,37 @@ const saveIssueBtn = document.getElementById("saveIssueBtn");
 const resetIssueBtn = document.getElementById("resetIssueBtn");
 
 /* =========
-   Firestore
+   Firestore readiness
 ========= */
-
 function ensureFirestoreReady() {
-  if (!window.db || !window.firebaseFns) {
-    alert("Firebase is not ready yet. Please refresh the page.");
-    return false;
-  }
-  return true;
-}
-
-async function loadIssuesFromFirestore() {
-  if (!ensureFirestoreReady()) return;
-
-  const { collection, getDocs, query, orderBy } = window.firebaseFns;
-
-  const colRef = collection(window.db, "issues");
-  const q = query(colRef, orderBy("createdAt", "desc"));
-
-  const snap = await getDocs(q);
-  issues = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-
-  // If nothing selected, select first (optional)
-  if (issues.length && !selectedIssueId) selectedIssueId = issues[0].id;
-
-  renderIssueList();
-  renderSelectedIssueDetails();
+  return !!(window.db && window.firebaseFns);
 }
 
 /* =========
-   UI: Tabs
+   Tabs
 ========= */
-
 function setActiveTab(tab) {
   const isCommon = tab === "common";
 
   tabCommon.classList.toggle("active", isCommon);
   tabNew.classList.toggle("active", !isCommon);
 
-  commonSection.classList.toggle("active", isCommon);
-  newSection.classList.toggle("active", !isCommon);
-
-  // Search applies to common issues list
-  searchInput.placeholder = isCommon
-    ? "Search issues (ex: 409, Azure AD, Okta)..."
-    : "Search issues (ex: 409, Azure AD, Okta)...";
+  commonSection.classList.toggle("hidden", !isCommon);
+  newSection.classList.toggle("hidden", isCommon);
 }
 
 tabCommon.addEventListener("click", () => setActiveTab("common"));
 tabNew.addEventListener("click", () => setActiveTab("new"));
 
 /* =========
-   UI: Application list
+   Applications
 ========= */
-
 function loadApplicationOptions() {
+  const custom = JSON.parse(localStorage.getItem("custom_apps") || "[]");
+  const merged = [...new Set([...DEFAULT_APPS, ...custom])];
+
   applicationSelect.innerHTML = `<option value="">Select application</option>`;
-  DEFAULT_APPS.forEach(app => {
+  merged.forEach(app => {
     const opt = document.createElement("option");
     opt.value = app;
     opt.textContent = app;
@@ -196,20 +168,19 @@ addNewAppBtn.addEventListener("click", () => {
   const cleaned = (name || "").trim();
   if (!cleaned) return;
 
-  // add to dropdown immediately
-  const opt = document.createElement("option");
-  opt.value = cleaned;
-  opt.textContent = cleaned;
-  applicationSelect.appendChild(opt);
+  const custom = JSON.parse(localStorage.getItem("custom_apps") || "[]");
+  if (!custom.includes(cleaned)) {
+    custom.push(cleaned);
+    localStorage.setItem("custom_apps", JSON.stringify(custom));
+  }
+
+  loadApplicationOptions();
   applicationSelect.value = cleaned;
 });
 
 /* =========
-   UI: Templates (tabs)
+   Templates
 ========= */
-
-let templateState = structuredClone(DEFAULT_TEMPLATES);
-
 function renderTemplateTabs() {
   templateTabs.innerHTML = "";
 
@@ -219,9 +190,7 @@ function renderTemplateTabs() {
     btn.className = "template-tab" + (idx === selectedTemplateIndex ? " active" : "");
     btn.textContent = t.name;
     btn.addEventListener("click", () => {
-      // Save current editor text into current template before switching
       templateState[selectedTemplateIndex].body = templateEditor.value;
-
       selectedTemplateIndex = idx;
       templateEditor.value = templateState[selectedTemplateIndex].body;
       renderTemplateTabs();
@@ -231,7 +200,6 @@ function renderTemplateTabs() {
 }
 
 addTemplateBtn.addEventListener("click", () => {
-  // Save current before adding
   templateState[selectedTemplateIndex].body = templateEditor.value;
 
   const nextNum = templateState.length + 1;
@@ -241,15 +209,51 @@ addTemplateBtn.addEventListener("click", () => {
 
   templateState.push({ name: cleaned, body: "" });
   selectedTemplateIndex = templateState.length - 1;
-
   renderTemplateTabs();
-  templateEditor.value = templateState[selectedTemplateIndex].body;
+  templateEditor.value = "";
 });
 
 /* =========
-   Common Issues list (title-only)
+   Load issues
 ========= */
+async function loadIssuesFromFirestore() {
+  if (!ensureFirestoreReady()) return;
 
+  const { collection, getDocs, query, orderBy } = window.firebaseFns;
+  const colRef = collection(window.db, "issues");
+
+  try {
+    const q = query(colRef, orderBy("createdAt", "desc"));
+    const snap = await getDocs(q);
+    issues = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch (e) {
+    // Fallback: if createdAt missing in older docs, orderBy can fail
+    console.warn("orderBy(createdAt) failed, falling back to unordered read:", e);
+    const snap = await getDocs(colRef);
+    issues = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    // Sort client-side best-effort
+    issues.sort((a, b) => {
+      const at = a.createdAt?.seconds || 0;
+      const bt = b.createdAt?.seconds || 0;
+      return bt - at;
+    });
+  }
+
+  issueCountPill.textContent = String(issues.length);
+
+  // keep selection if possible
+  if (!selectedIssueId && issues.length) selectedIssueId = issues[0].id;
+  if (selectedIssueId && !issues.some(x => x.id === selectedIssueId)) {
+    selectedIssueId = issues.length ? issues[0].id : null;
+  }
+
+  renderIssueList();
+  renderSelectedIssueDetails();
+}
+
+/* =========
+   Search + list
+========= */
 function getFilteredIssues() {
   const q = (searchInput.value || "").trim().toLowerCase();
   if (!q) return issues;
@@ -269,34 +273,31 @@ function renderIssueList() {
   const list = getFilteredIssues();
 
   if (!list.length) {
-    issueList.innerHTML = `<div class="empty-state">No issues found.</div>`;
-    issueDetailsPanel.innerHTML = `<div class="placeholder">Select an issue to view details.</div>`;
-    selectedIssueId = null;
+    issueList.innerHTML = `<li class="empty-state">No issues found.</li>`;
     return;
   }
 
   issueList.innerHTML = "";
 
   list.forEach(it => {
-    const row = document.createElement("button");
-    row.type = "button";
-    row.className = "issue-row" + (it.id === selectedIssueId ? " selected" : "");
+    const li = document.createElement("li");
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "issue-item" + (it.id === selectedIssueId ? " active" : "");
 
-    // Title-only (as requested)
-    row.innerHTML = `
-      <div class="issue-row-title">${escapeHtml(it.issueDescription || "Untitled issue")}</div>
-      <div class="issue-row-meta">
-        ${it.application ? `<span class="pill">${escapeHtml(it.application)}</span>` : ""}
-      </div>
+    btn.innerHTML = `
+      <div class="issue-item-title">${escapeHtml(it.issueDescription || "Untitled issue")}</div>
+      <div class="issue-item-sub">${escapeHtml(it.application || "—")}</div>
     `;
 
-    row.addEventListener("click", () => {
+    btn.addEventListener("click", () => {
       selectedIssueId = it.id;
       renderIssueList();
       renderSelectedIssueDetails();
     });
 
-    issueList.appendChild(row);
+    li.appendChild(btn);
+    issueList.appendChild(li);
   });
 }
 
@@ -306,9 +307,8 @@ searchInput.addEventListener("input", () => {
 });
 
 /* =========
-   Details panel (view + edit)
+   Details + Edit
 ========= */
-
 function findSelectedIssue() {
   if (!selectedIssueId) return null;
   return issues.find(x => x.id === selectedIssueId) || null;
@@ -317,118 +317,115 @@ function findSelectedIssue() {
 function renderSelectedIssueDetails() {
   const it = findSelectedIssue();
   if (!it) {
-    issueDetailsPanel.innerHTML = `<div class="placeholder">Select an issue to view details.</div>`;
+    issueDetailsPanel.innerHTML = `
+      <div class="details-placeholder">
+        <div class="muted">Select an issue to view details.</div>
+      </div>
+    `;
     return;
   }
 
   const checklistHtml = bulletsToHtml(it.checklistItems || []);
   const zendesk = safeUrl(it.zendeskLink);
-
-  // Template switcher inside details
   const templates = Array.isArray(it.templates) ? it.templates : [];
-  const templateButtons = templates.map((t, idx) => {
-    return `<button type="button" class="template-tab ${idx === 0 ? "active" : ""}" data-tidx="${idx}">
-      ${escapeHtml(t.name || `Template ${idx + 1}`)}
-    </button>`;
-  }).join("");
+
+  const templateTabsHtml = templates.length
+    ? `<div class="template-tabs" id="detailsTemplateTabs">
+        ${templates.map((t, idx) =>
+          `<button type="button" class="template-tab ${idx === 0 ? "active" : ""}" data-tidx="${idx}">
+            ${escapeHtml(t.name || `Template ${idx + 1}`)}
+          </button>`
+        ).join("")}
+      </div>`
+    : "";
 
   issueDetailsPanel.innerHTML = `
-    <div class="card details-card">
-      <div class="details-header">
-        <div>
-          <h3 class="details-title">${escapeHtml(it.issueDescription || "Untitled issue")}</h3>
-          <div class="details-sub">
-            ${it.application ? `<span class="pill">${escapeHtml(it.application)}</span>` : ""}
-          </div>
-        </div>
+    <div class="issue-title-row">
+      <div>
+        <h3 class="big-title">${escapeHtml(it.issueDescription || "Untitled issue")}</h3>
+      </div>
+      <div class="pill">${escapeHtml(it.application || "—")}</div>
+    </div>
 
-        <div class="details-actions">
-          <button type="button" class="secondary-btn" id="editIssueBtn">Edit</button>
+    <div class="kv" id="detailsView">
+      <div class="kv-row">
+        <div class="kv-key">Root cause</div>
+        <div class="kv-val">${escapeHtml(it.rootCause || "") || "<span class='muted'>—</span>"}</div>
+      </div>
+
+      <div class="kv-row">
+        <div class="kv-key">Checklist</div>
+        <div class="kv-val">${checklistHtml}</div>
+      </div>
+
+      <div class="kv-row">
+        <div class="kv-key">Solution</div>
+        <div class="kv-val prewrap">${escapeHtml(it.solution || "") || "<span class='muted'>—</span>"}</div>
+      </div>
+
+      <div class="kv-row">
+        <div class="kv-key">Zendesk ticket</div>
+        <div class="kv-val">
+          ${zendesk ? `<a class="link" href="${escapeHtml(zendesk)}" target="_blank" rel="noreferrer">${escapeHtml(zendesk)}</a>` : "<span class='muted'>—</span>"}
         </div>
       </div>
 
-      <div class="details-body" id="detailsBodyView">
-        <div class="detail-block">
-          <div class="detail-label">Root cause</div>
-          <div class="detail-value">${escapeHtml(it.rootCause || "") || "<span class='muted'>—</span>"}</div>
-        </div>
-
-        <div class="detail-block">
-          <div class="detail-label">Checklist</div>
-          <div class="detail-value">${checklistHtml}</div>
-        </div>
-
-        <div class="detail-block">
-          <div class="detail-label">Solution</div>
-          <div class="detail-value">${escapeHtml(it.solution || "") || "<span class='muted'>—</span>"}</div>
-        </div>
-
-        <div class="detail-block">
-          <div class="detail-label">Zendesk ticket</div>
-          <div class="detail-value">
-            ${zendesk ? `<a href="${escapeHtml(zendesk)}" target="_blank" rel="noreferrer">${escapeHtml(zendesk)}</a>` : "<span class='muted'>—</span>"}
-          </div>
-        </div>
-
-        <div class="detail-block">
-          <div class="detail-label">Email templates</div>
-          <div class="detail-value">
-            ${templates.length ? `
-              <div class="template-tabs" id="detailsTemplateTabs">${templateButtons}</div>
-              <textarea id="detailsTemplateBox" class="template-box" rows="8" readonly>${escapeHtml(templates[0]?.body || "")}</textarea>
-            ` : "<span class='muted'>No templates saved.</span>"}
-          </div>
+      <div class="kv-row">
+        <div class="kv-key">Email templates</div>
+        <div class="kv-val">
+          ${templates.length ? `
+            ${templateTabsHtml}
+            <textarea id="detailsTemplateBox" class="template-box" rows="8" readonly>${escapeHtml(templates[0]?.body || "")}</textarea>
+          ` : "<span class='muted'>No templates saved.</span>"}
         </div>
       </div>
 
-      <div class="details-body hidden" id="detailsBodyEdit">
-        <div class="form-grid">
-          <div class="form-row">
-            <label>Issue Description</label>
-            <input id="editIssueDescription" type="text" value="${escapeHtml(it.issueDescription || "")}" />
-          </div>
+      <div class="kv-row">
+        <button type="button" class="btn btn-secondary" id="editIssueBtn">Edit</button>
+      </div>
+    </div>
 
-          <div class="form-row">
-            <label>Application</label>
-            <input id="editApplication" type="text" value="${escapeHtml(it.application || "")}" />
-            <small class="hint">You can edit the application name here.</small>
-          </div>
-
-          <div class="form-row">
-            <label>Root Cause</label>
-            <input id="editRootCause" type="text" value="${escapeHtml(it.rootCause || "")}" />
-          </div>
-
-          <div class="form-row">
-            <label>Checklists (one per line)</label>
-            <textarea id="editChecklists" rows="6">${escapeHtml((it.checklistItems || []).join("\n"))}</textarea>
-          </div>
-
-          <div class="form-row">
-            <label>Zendesk Ticket Link</label>
-            <input id="editZendesk" type="url" value="${escapeHtml(it.zendeskLink || "")}" />
-          </div>
-
-          <div class="form-row">
-            <label>Solution</label>
-            <textarea id="editSolution" rows="5">${escapeHtml(it.solution || "")}</textarea>
-          </div>
-
-          <div class="form-row">
-            <label>Email templates</label>
-            <small class="hint">Editing templates is done from New Issues in this version.</small>
-          </div>
+    <div class="kv hidden" id="detailsEdit">
+      <div class="form-grid">
+        <div class="form-row">
+          <label>Issue Description</label>
+          <input id="editIssueDescription" type="text" value="${escapeHtml(it.issueDescription || "")}" />
         </div>
 
-        <div class="form-actions">
-          <button type="button" class="primary-btn" id="saveEditBtn">Save changes</button>
-          <button type="button" class="secondary-btn" id="cancelEditBtn">Cancel</button>
+        <div class="form-row">
+          <label>Application</label>
+          <input id="editApplication" type="text" value="${escapeHtml(it.application || "")}" />
         </div>
+
+        <div class="form-row">
+          <label>Root Cause</label>
+          <input id="editRootCause" type="text" value="${escapeHtml(it.rootCause || "")}" />
+        </div>
+
+        <div class="form-row">
+          <label>Checklists (one per line)</label>
+          <textarea id="editChecklists" rows="6">${escapeHtml((it.checklistItems || []).join("\n"))}</textarea>
+        </div>
+
+        <div class="form-row">
+          <label>Zendesk Ticket Link</label>
+          <input id="editZendesk" type="url" value="${escapeHtml(it.zendeskLink || "")}" />
+        </div>
+
+        <div class="form-row">
+          <label>Solution</label>
+          <textarea id="editSolution" rows="5">${escapeHtml(it.solution || "")}</textarea>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button type="button" class="btn btn-primary" id="saveEditBtn">Save changes</button>
+        <button type="button" class="btn btn-secondary" id="cancelEditBtn">Cancel</button>
       </div>
     </div>
   `;
 
-  // Template switching in details
+  // Template switching (details)
   const detailsTabs = document.getElementById("detailsTemplateTabs");
   if (detailsTabs) {
     detailsTabs.addEventListener("click", (e) => {
@@ -439,7 +436,6 @@ function renderSelectedIssueDetails() {
       const box = document.getElementById("detailsTemplateBox");
       if (!box) return;
 
-      // set active class
       [...detailsTabs.querySelectorAll("button")].forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
 
@@ -449,16 +445,15 @@ function renderSelectedIssueDetails() {
 
   // Edit toggles
   const editBtn = document.getElementById("editIssueBtn");
-  const viewBody = document.getElementById("detailsBodyView");
-  const editBody = document.getElementById("detailsBodyEdit");
+  const view = document.getElementById("detailsView");
+  const edit = document.getElementById("detailsEdit");
 
   editBtn?.addEventListener("click", () => {
-    viewBody.classList.add("hidden");
-    editBody.classList.remove("hidden");
+    view.classList.add("hidden");
+    edit.classList.remove("hidden");
   });
 
   document.getElementById("cancelEditBtn")?.addEventListener("click", () => {
-    // rerender to discard local edits
     renderSelectedIssueDetails();
   });
 
@@ -479,22 +474,20 @@ function renderSelectedIssueDetails() {
 async function updateIssueInFirestore(docId, updatedFields) {
   if (!ensureFirestoreReady()) return;
 
-  const { doc, updateDoc } = window.firebaseFns;
-
+  const { doc, updateDoc, serverTimestamp } = window.firebaseFns;
   const ref = doc(window.db, "issues", docId);
+
   await updateDoc(ref, {
     ...updatedFields,
-    updatedAt: window.firebaseFns.serverTimestamp()
+    updatedAt: serverTimestamp()
   });
 
-  // Reload to reflect changes
   await loadIssuesFromFirestore();
 }
 
 /* =========
    Save new issue
 ========= */
-
 function resetForm() {
   issueDescription.value = "";
   applicationSelect.value = "";
@@ -512,28 +505,23 @@ function resetForm() {
 resetIssueBtn.addEventListener("click", resetForm);
 
 saveIssueBtn.addEventListener("click", async () => {
-  if (!ensureFirestoreReady()) return;
+  if (!ensureFirestoreReady()) {
+    alert("Firebase is still loading. Please refresh and try again.");
+    return;
+  }
 
   const desc = (issueDescription.value || "").trim();
   const app = (applicationSelect.value || "").trim();
-  const rc = (rootCause.value || "").trim();
 
-  if (!desc) {
-    alert("Please enter an Issue Description.");
-    return;
-  }
-  if (!app) {
-    alert("Please select an Application (or add a new one).");
-    return;
-  }
+  if (!desc) return alert("Please enter an Issue Description.");
+  if (!app) return alert("Please select an Application (or add a new one).");
 
-  // save current template editor into selected template
   templateState[selectedTemplateIndex].body = templateEditor.value;
 
   const payload = {
     issueDescription: desc,
     application: app,
-    rootCause: rc,
+    rootCause: (rootCause.value || "").trim(),
     checklistItems: linesToBullets(checklists.value || ""),
     zendeskLink: (zendeskLink.value || "").trim(),
     solution: (solution.value || "").trim(),
@@ -562,18 +550,13 @@ saveIssueBtn.addEventListener("click", async () => {
 /* =========
    Init
 ========= */
-
 function init() {
+  setActiveTab("common");
   loadApplicationOptions();
 
-  // templates UI init
   renderTemplateTabs();
   templateEditor.value = templateState[0].body;
 
-  // initial tab
-  setActiveTab("common");
-
-  // load from firestore
   loadIssuesFromFirestore();
 }
 

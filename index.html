@@ -4,25 +4,31 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Troubleshooting Checklist Portal</title>
-  <link rel="stylesheet" href="style.css" />
+
+  <!-- Cache-bust so GitHub Pages/phone loads the latest -->
+  <link rel="stylesheet" href="style.css?v=5" />
 </head>
 
 <body>
-  <header>
-    <h1>Troubleshooting Checklist Portal</h1>
-    <p>Internal Support & Investigation Guide</p>
+  <header class="site-header">
+    <div class="header-inner">
+      <h1>Troubleshooting Checklist Portal</h1>
+      <p>Internal Support & Investigation Guide</p>
+    </div>
   </header>
 
   <main class="page">
-
+    <!-- Tabs -->
     <div class="top-tabs">
       <button id="tabCommon" class="tab-btn active" type="button">Common Issues</button>
       <button id="tabNew" class="tab-btn" type="button">New Issues</button>
     </div>
 
-    <div class="search-container">
+    <!-- Search -->
+    <div class="search-row">
       <input
         id="searchInput"
+        class="search-input"
         type="text"
         placeholder="Search issues (ex: 409, Azure AD, Okta)..."
         autocomplete="off"
@@ -30,29 +36,41 @@
     </div>
 
     <!-- COMMON ISSUES -->
-    <section id="commonSection" class="section active">
-      <h2>Common Issues</h2>
-      <p class="subtext">Saved issues will appear here. Use search above to filter.</p>
+    <section id="commonSection" class="section">
+      <div class="section-title">
+        <h2>Common Issues</h2>
+        <div class="muted">Saved issues will appear here. Use search above to filter.</div>
+      </div>
 
-      <div class="common-layout">
-        <div class="issue-list" id="issueList"></div>
+      <div class="two-col">
+        <!-- List -->
+        <div class="card list-card">
+          <div class="card-head">
+            <div class="card-title">Issues</div>
+            <div class="pill muted-pill" id="issueCountPill">0</div>
+          </div>
 
-        <div class="issue-details-panel" id="issueDetailsPanel">
-          <div class="placeholder">
-            Select an issue to view details.
+          <ul class="issue-list" id="issueList"></ul>
+        </div>
+
+        <!-- Details -->
+        <div class="card details-card" id="issueDetailsPanel">
+          <div class="details-placeholder">
+            <div class="muted">Select an issue to view details.</div>
           </div>
         </div>
       </div>
     </section>
 
     <!-- NEW ISSUES -->
-    <section id="newSection" class="section">
-      <h2>Add New Issue Checklist</h2>
-      <p class="subtext">Fill the form, then click Save. It will show up in Common Issues.</p>
+    <section id="newSection" class="section hidden">
+      <div class="section-title">
+        <h2>Add New Issue Checklist</h2>
+        <div class="muted">Fill the form, then click Save. It will show up in Common Issues.</div>
+      </div>
 
       <div class="card form-card">
         <div class="form-grid">
-
           <div class="form-row">
             <label for="issueDescription">Issue Description</label>
             <input id="issueDescription" type="text" placeholder='Example: "409 Error"' />
@@ -60,64 +78,61 @@
 
           <div class="form-row">
             <label>Application</label>
-            <div class="app-row">
-              <select id="applicationSelect">
-                <option value="">Select application</option>
-              </select>
-              <button id="addNewAppBtn" type="button" class="secondary-btn">
-                + Add new application
-              </button>
+            <div class="inline-row">
+              <select id="applicationSelect"></select>
+              <button id="addNewAppBtn" type="button" class="btn btn-secondary small">+ Add new application</button>
             </div>
-            <small class="hint">Choose from the list or add a new one.</small>
+            <div class="hint">Choose from the list or add a new one.</div>
           </div>
 
           <div class="form-row">
             <label for="rootCause">Root Cause</label>
-            <input id="rootCause" type="text" />
+            <input id="rootCause" type="text" placeholder='Example: "Server Misconfiguration"' />
           </div>
 
           <div class="form-row">
             <label for="checklists">Checklists (bullet points)</label>
-            <textarea id="checklists" rows="6"></textarea>
-            <small class="hint">One line = one bullet point.</small>
+            <textarea
+              id="checklists"
+              rows="6"
+              placeholder="Write one checklist item per line&#10;Example:&#10;Check server settings&#10;Review application logs"
+            ></textarea>
+            <div class="hint">One line = one bullet point.</div>
           </div>
 
           <div class="form-row">
             <label for="zendeskLink">Zendesk Ticket Link</label>
-            <input id="zendeskLink" type="url" />
+            <input id="zendeskLink" type="url" placeholder="https://your-zendesk-link" />
           </div>
 
           <div class="form-row">
             <label for="solution">Solution</label>
-            <textarea id="solution" rows="5"></textarea>
+            <textarea id="solution" rows="5" placeholder="Write the solution in detail..."></textarea>
           </div>
 
           <div class="form-row">
             <label>Ready-Made Email Templates</label>
-            <div class="template-tabs" id="templateTabs"></div>
-            <textarea id="templateEditor" rows="8"></textarea>
 
-            <div class="template-actions">
-              <button id="addTemplateBtn" type="button" class="secondary-btn">
-                + Add template
-              </button>
-              <small class="hint">You can edit the template text before saving.</small>
+            <div class="template-tabs" id="templateTabs"></div>
+
+            <textarea id="templateEditor" class="template-editor" rows="8" placeholder="Template content..."></textarea>
+
+            <div class="row-between">
+              <button id="addTemplateBtn" type="button" class="btn btn-secondary small">+ Add template</button>
+              <div class="hint">You can edit the template text before saving.</div>
             </div>
           </div>
-
         </div>
 
         <div class="form-actions">
-          <button id="saveIssueBtn" type="button" class="primary-btn">Save</button>
-          <button id="resetIssueBtn" type="button" class="secondary-btn">Reset</button>
+          <button id="saveIssueBtn" type="button" class="btn btn-primary">Save</button>
+          <button id="resetIssueBtn" type="button" class="btn btn-secondary">Reset</button>
         </div>
-
       </div>
     </section>
-
   </main>
 
-  <footer>
+  <footer class="site-footer">
     Internal Use Only | Troubleshooting Portal
   </footer>
 
@@ -163,11 +178,10 @@
       orderBy
     };
 
-    // IMPORTANT: Load script.js only after Firebase is ready
+    // Load script.js only after Firebase is initialized
     const s = document.createElement("script");
-    s.src = "script.js?v=2";
+    s.src = "script.js?v=5";
     document.body.appendChild(s);
   </script>
-
 </body>
 </html>
