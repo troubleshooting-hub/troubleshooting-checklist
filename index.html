@@ -33,179 +33,229 @@
 
   </div>
 </header>
-  <main class="page">
-    <div class="top-tabs">
-      <button id="tabCommon" class="tab-btn active" type="button">Common Issues</button>
-      <button id="tabNew" class="tab-btn" type="button">New Issues</button>
+
+<main class="page">
+
+  <div class="top-tabs">
+    <button id="tabCommon" class="tab-btn active" type="button">Common Issues</button>
+    <button id="tabNew" class="tab-btn" type="button">New Issues</button>
+    <button id="tabHelp" class="tab-btn" type="button">Help me troubleshoot</button>
+  </div>
+
+  <div class="search-row">
+    <input
+      id="searchInput"
+      class="search-input"
+      type="text"
+      placeholder="Search issues (ex: 409, Azure AD, Okta)..."
+      autocomplete="off"
+    />
+  </div>
+
+  <!-- ===================================================== -->
+  <!-- COMMON ISSUES -->
+  <!-- ===================================================== -->
+  <section id="commonSection" class="section">
+    <div class="section-title">
+      <h2>Common Issues</h2>
+      <div class="muted">Saved issues will appear here. Use search above to filter.</div>
     </div>
 
-    <div class="search-row">
-      <input
-        id="searchInput"
-        class="search-input"
-        type="text"
-        placeholder="Search issues (ex: 409, Azure AD, Okta)..."
-        autocomplete="off"
-      />
+    <!-- LIST SCREEN -->
+    <div id="commonListView">
+      <div class="card list-card">
+        <div class="card-head">
+          <div class="card-title">Issues</div>
+          <div class="pill muted-pill" id="issuesCountPill">0</div>
+        </div>
+        <ul class="issue-list" id="issueList"></ul>
+      </div>
     </div>
 
-    <!-- COMMON ISSUES -->
-    <section id="commonSection" class="section">
-      <div class="section-title">
-        <h2>Common Issues</h2>
-        <div class="muted">Saved issues will appear here. Use search above to filter.</div>
+    <!-- DETAIL SCREEN -->
+    <div id="commonDetailView" class="hidden">
+      <div class="row-between" style="margin-bottom: 12px;">
+        <button id="backToListBtn" type="button" class="btn btn-secondary small">← Back</button>
+        <span class="pill muted-pill">Issue Details</span>
       </div>
+      <div id="issueDetailsPanel"></div>
+    </div>
+  </section>
 
-      <!-- LIST SCREEN -->
-      <div id="commonListView">
-        <div class="card list-card">
-          <div class="card-head">
-            <div class="card-title">Issues</div>
-            <div class="pill muted-pill" id="issuesCountPill">0</div>
-          </div>
-          <ul class="issue-list" id="issueList"></ul>
+  <!-- ===================================================== -->
+  <!-- NEW ISSUES -->
+  <!-- ===================================================== -->
+  <section id="newSection" class="section hidden">
+    <div class="section-title">
+      <h2>Add New Issue Checklist</h2>
+      <div class="muted">Fill the form, then click Save. It will show up in Common Issues.</div>
+    </div>
+
+    <div class="card form-card">
+      <div class="form-grid">
+
+        <div class="form-row">
+          <label for="issueDescription">Issue Description</label>
+          <input id="issueDescription" type="text" placeholder='Example: "409 Error"' />
         </div>
-      </div>
 
-      <!-- DETAIL SCREEN -->
-      <div id="commonDetailView" class="hidden">
-        <div class="row-between" style="margin-bottom: 12px;">
-          <button id="backToListBtn" type="button" class="btn btn-secondary small">← Back</button>
-          <span class="pill muted-pill">Issue Details</span>
+        <div class="form-row">
+          <label>Application</label>
+          <div class="inline-row">
+            <select id="applicationSelect">
+              <option value="">Select application</option>
+            </select>
+            <button id="addNewAppBtn" type="button" class="btn btn-secondary small">+ Add new application</button>
+          </div>
+          <small class="hint">Choose from the list or add a new one.</small>
         </div>
-        <div id="issueDetailsPanel"></div>
+
+        <div class="form-row">
+          <label for="rootCause">Root Cause</label>
+          <input id="rootCause" type="text" />
+        </div>
+
+        <div class="form-row">
+          <label for="checklists">Checklists (bullet points)</label>
+          <textarea id="checklists" rows="6"></textarea>
+          <small class="hint">One line = one bullet point.</small>
+        </div>
+
+        <div class="form-row">
+          <label for="zendeskLink">Zendesk Ticket Link</label>
+          <input id="zendeskLink" type="url" />
+        </div>
+
+        <div class="form-row">
+          <label for="solution">Solution</label>
+          <textarea id="solution" rows="5"></textarea>
+        </div>
+
+        <div class="form-row">
+          <label>Ready-Made Email Templates</label>
+          <div class="template-tabs" id="templateTabs"></div>
+          <textarea id="templateEditor" class="template-editor" rows="10"></textarea>
+
+          <div class="row-between" style="margin-top:10px;">
+            <button id="addTemplateBtn" type="button" class="btn btn-secondary small">+ Add template</button>
+            <small class="hint">You can edit the template text before saving.</small>
+          </div>
+        </div>
+
       </div>
-    </section>
 
-    <!-- NEW ISSUES -->
-    <section id="newSection" class="section hidden">
-      <div class="section-title">
-        <h2>Add New Issue Checklist</h2>
-        <div class="muted">Fill the form, then click Save. It will show up in Common Issues.</div>
+      <div class="form-actions">
+        <button id="saveIssueBtn" type="button" class="btn btn-primary">Save</button>
+        <button id="resetIssueBtn" type="button" class="btn btn-secondary">Reset</button>
       </div>
+    </div>
+  </section>
 
-      <div class="card form-card">
-        <div class="form-grid">
+  <!-- ===================================================== -->
+  <!-- HELP ME TROUBLESHOOT -->
+  <!-- ===================================================== -->
+  <section id="helpSection" class="section hidden">
+    <div class="section-title">
+      <h2>Help Me Troubleshoot</h2>
+      <div class="muted">
+        Describe your issue. We’ll match it with Common Issues and return a checklist.
+      </div>
+    </div>
 
-          <div class="form-row">
-            <label for="issueDescription">Issue Description</label>
-            <input id="issueDescription" type="text" placeholder='Example: "409 Error"' />
-          </div>
+    <div class="card form-card">
+      <div class="form-grid">
 
-          <div class="form-row">
-            <label>Application</label>
-            <div class="inline-row">
-              <select id="applicationSelect">
-                <option value="">Select application</option>
-              </select>
-              <button id="addNewAppBtn" type="button" class="btn btn-secondary small">+ Add new application</button>
-            </div>
-            <small class="hint">Choose from the list or add a new one.</small>
-          </div>
-
-          <div class="form-row">
-            <label for="rootCause">Root Cause</label>
-            <input id="rootCause" type="text" />
-          </div>
-
-          <div class="form-row">
-            <label for="checklists">Checklists (bullet points)</label>
-            <textarea id="checklists" rows="6"></textarea>
-            <small class="hint">One line = one bullet point.</small>
-          </div>
-
-          <div class="form-row">
-            <label for="zendeskLink">Zendesk Ticket Link</label>
-            <input id="zendeskLink" type="url" />
-          </div>
-
-          <div class="form-row">
-            <label for="solution">Solution</label>
-            <textarea id="solution" rows="5"></textarea>
-          </div>
-
-          <div class="form-row">
-            <label>Ready-Made Email Templates</label>
-            <div class="template-tabs" id="templateTabs"></div>
-            <textarea id="templateEditor" class="template-editor" rows="10"></textarea>
-
-            <div class="row-between" style="margin-top:10px;">
-              <button id="addTemplateBtn" type="button" class="btn btn-secondary small">+ Add template</button>
-              <small class="hint">You can edit the template text before saving.</small>
-            </div>
-          </div>
-
+        <div class="form-row">
+          <label for="helpIssueInput">What issue are you facing?</label>
+          <input
+            id="helpIssueInput"
+            type="text"
+            placeholder='Example: "409 error: User Principal Name already exists"'
+            autocomplete="off"
+          />
+          <small class="hint">Include error code + system (Azure AD / AD / Okta).</small>
         </div>
 
         <div class="form-actions">
-          <button id="saveIssueBtn" type="button" class="btn btn-primary">Save</button>
-          <button id="resetIssueBtn" type="button" class="btn btn-secondary">Reset</button>
+          <button id="helpFindBtn" type="button" class="btn btn-primary">Find checklist</button>
+          <button id="helpClearBtn" type="button" class="btn btn-secondary">Clear</button>
+        </div>
+
+        <div class="form-row">
+          <label>Result</label>
+          <div id="helpResult" class="card" style="padding:14px;">
+            <div class="muted">
+              Enter an issue above and click “Find checklist”.
+            </div>
+          </div>
         </div>
 
       </div>
-    </section>
-  </main>
+    </div>
+  </section>
 
-  <footer class="site-footer">
-    Internal Use Only | Troubleshooting Portal
-  </footer>
+</main>
 
-  <!-- quick sanity check: if CSS didn’t load, body bg will still be white -->
-  <script>
-    window.addEventListener("load", () => {
-      const bg = getComputedStyle(document.body).backgroundColor;
-      if (bg === "rgba(0, 0, 0, 0)" || bg === "rgb(255, 255, 255)") {
-        console.warn("CSS probably did not load. Check /troubleshooting-checklist/style.css");
-      }
-    });
-  </script>
+<footer class="site-footer">
+  Internal Use Only | Troubleshooting Portal
+</footer>
 
-  <!-- Firebase Setup -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
-    import {
-      getFirestore,
-      collection,
-      addDoc,
-      getDocs,
-      doc,
-      updateDoc,
-      deleteDoc,
-      serverTimestamp,
-      query,
-      orderBy
-    } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
+<!-- quick sanity check -->
+<script>
+  window.addEventListener("load", () => {
+    const bg = getComputedStyle(document.body).backgroundColor;
+    if (bg === "rgba(0, 0, 0, 0)" || bg === "rgb(255, 255, 255)") {
+      console.warn("CSS probably did not load. Check /troubleshooting-checklist/style.css");
+    }
+  });
+</script>
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyC7hu52JLlf9_IA0UA10RaIRiWaoWhIpr8",
-      authDomain: "troubleshooting-hub.firebaseapp.com",
-      projectId: "troubleshooting-hub",
-      storageBucket: "troubleshooting-hub.firebasestorage.app",
-      messagingSenderId: "725774852364",
-      appId: "1:725774852364:web:5c16dcaffa96a5b7ab6929"
-    };
+<!-- Firebase Setup -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
+  import {
+    getFirestore,
+    collection,
+    addDoc,
+    getDocs,
+    doc,
+    updateDoc,
+    deleteDoc,
+    serverTimestamp,
+    query,
+    orderBy
+  } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
 
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
+  const firebaseConfig = {
+    apiKey: "AIzaSyC7hu52JLlf9_IA0UA10RaIRiWaoWhIpr8",
+    authDomain: "troubleshooting-hub.firebaseapp.com",
+    projectId: "troubleshooting-hub",
+    storageBucket: "troubleshooting-hub.firebasestorage.app",
+    messagingSenderId: "725774852364",
+    appId: "1:725774852364:web:5c16dcaffa96a5b7ab6929"
+  };
 
-    window.db = db;
-    window.firebaseFns = {
-      collection,
-      addDoc,
-      getDocs,
-      doc,
-      updateDoc,
-      deleteDoc,
-      serverTimestamp,
-      query,
-      orderBy
-    };
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
 
-    // Load script.js only after Firebase globals exist
-    const s = document.createElement("script");
-    s.src = "/troubleshooting-checklist/script.js?v=20";
-    s.defer = true;
-    document.body.appendChild(s);
-  </script>
+  window.db = db;
+  window.firebaseFns = {
+    collection,
+    addDoc,
+    getDocs,
+    doc,
+    updateDoc,
+    deleteDoc,
+    serverTimestamp,
+    query,
+    orderBy
+  };
+
+  const s = document.createElement("script");
+  s.src = "/troubleshooting-checklist/script.js?v=20";
+  s.defer = true;
+  document.body.appendChild(s);
+</script>
+
 </body>
 </html>

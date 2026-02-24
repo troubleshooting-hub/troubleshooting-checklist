@@ -29,6 +29,10 @@ function safeUrl(url) {
   try { new URL(u); return u; } catch { return ""; }
 }
 
+function normalizeText(s = "") {
+  return String(s).toLowerCase().replace(/\s+/g, " ").trim();
+}
+
 /* =========
    App State
 ========= */
@@ -92,8 +96,11 @@ let templateState = structuredClone(DEFAULT_TEMPLATES);
 
 const tabCommon = document.getElementById("tabCommon");
 const tabNew = document.getElementById("tabNew");
+const tabHelp = document.getElementById("tabHelp");
+
 const commonSection = document.getElementById("commonSection");
 const newSection = document.getElementById("newSection");
+const helpSection = document.getElementById("helpSection");
 
 const searchInput = document.getElementById("searchInput");
 
@@ -120,6 +127,12 @@ const addTemplateBtn = document.getElementById("addTemplateBtn");
 
 const saveIssueBtn = document.getElementById("saveIssueBtn");
 const resetIssueBtn = document.getElementById("resetIssueBtn");
+
+// Help tab
+const helpIssueInput = document.getElementById("helpIssueInput");
+const helpSearchBtn = document.getElementById("helpSearchBtn");
+const helpAskChatGPTBtn = document.getElementById("helpAskChatGPTBtn");
+const helpResults = document.getElementById("helpResults");
 
 /* =========
    Firestore
@@ -166,22 +179,34 @@ async function loadIssuesFromFirestore() {
 
 function setActiveTab(tab) {
   const isCommon = tab === "common";
+  const isNew = tab === "new";
+  const isHelp = tab === "help";
 
   tabCommon.classList.toggle("active", isCommon);
-  tabNew.classList.toggle("active", !isCommon);
+  tabNew.classList.toggle("active", isNew);
+  tabHelp.classList.toggle("active", isHelp);
 
   commonSection.classList.toggle("hidden", !isCommon);
-  newSection.classList.toggle("hidden", isCommon);
+  newSection.classList.toggle("hidden", !isNew);
+  helpSection.classList.toggle("hidden", !isHelp);
 
+  // Keep your original behavior: search bar only for Common Issues
   searchInput.style.display = isCommon ? "" : "none";
 
+  // Only reset list/detail when leaving Common tab
   if (!isCommon) {
     showListScreen();
+  }
+
+  // Clear Help results when switching away
+  if (!isHelp && helpResults) {
+    helpResults.innerHTML = "";
   }
 }
 
 tabCommon.addEventListener("click", () => setActiveTab("common"));
 tabNew.addEventListener("click", () => setActiveTab("new"));
+tabHelp.addEventListener("click", () => setActiveTab("help"));
 
 /* =========
    Common Issues screens
@@ -317,6 +342,205 @@ function renderIssueList() {
 searchInput.addEventListener("input", () => {
   if (isInDetailScreen()) showListScreen();
   renderIssueList();
+});
+
+/* =========
+   Help Me Troubleshoot
+========= */
+
+function scoreIssueMatch(queryText, issue) {
+  const q = normalizeText(queryText);
+  if (!q) return 0;
+
+  const hay = normalizeText([
+    issue.issueDescription,
+    issue.application,
+    issue.rootCause,
+    ...(issue.checklistItems || [])
+  ].join(" "));
+
+  if (!hay) return 0;
+
+  // Simple scoring:
+  // 1) direct substring = strong match
+  if (hay.includes(q)) return 100;
+
+  // 2) token overlap = medium match
+  const qTokens = q.split(" ").filter(Boolean);
+  let hit = 0;
+  for (const t of qTokens) {
+    if (t.length < 3) continue;
+    if (hay.includes(t)) hit += 1;
+  }
+  return hit;
+}
+
+function findBestCommonIssue(queryText) {
+  if (!Array.isArray(issues) || issues.length === 0) return null;
+
+  let best = null;
+  let bestScore = 0;
+
+  for (const it of issues) {
+    const s = scoreIssueMatch(queryText, it);
+    if (s > bestScore) {
+      bestScore = s;
+      best = it;
+    }
+  }
+
+  // Require a minimum score so random text doesn't “match”
+  // If substring match => 100, token overlap => small ints
+  if (bestScore >= 2) return best;
+  return null;
+}
+
+function renderHelpResult(match, userQuery) {
+  if (!helpResults) return;
+
+  if (!userQuery.trim()) {
+    helpResults.innerHTML = `
+      <div class="card details-card">
+        <div class="details-placeholder">Please enter an issue description first.</div>
+      </div>
+    `;
+    return;
+  }
+
+  if (!match) {
+    helpResults.innerHTML = `
+      <div class="card details-card">
+        <div class="card-head">
+          <div class="big-title">No matching Common Issue found</div>
+        </div>
+        <div class="kv">
+          <div class="kv-row">
+            <div class="kv-key">Next steps</div>
+            <div class="kv-val">
+              <ol class="bullet-list">
+                <li>Click <strong>Ask ChatGPT (copy prompt)</strong> to generate a guided troubleshooting plan.</li>
+                <li>If you have an internal AD PDF later, we can add a “search inside PDF” step.</li>
+                <li>If still unresolved, share the error + environment details and we’ll refine.</li>
+              </ol>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  const checklistHtml = bulletsToHtml(match.checklistItems || []);
+  helpResults.innerHTML = `
+    <div class="card details-card">
+      <div class="card-head">
+        <div class="big-title">Matched Common Issue</div>
+        <div class="card-actions">
+          ${match.application ? `<span class="pill">${escapeHtml(match.application)}</span>` : ""}
+          <button type="button" class="btn btn-secondary small" id="helpOpenIssueBtn">Open in Common Issues</button>
+        </div>
+      </div>
+
+      <div class="kv">
+        <div class="kv-row">
+          <div class="kv-key">Issue</div>
+          <div class="kv-val">${escapeHtml(match.issueDescription || "Untitled issue")}</div>
+        </div>
+
+        <div class="kv-row">
+          <div class="kv-key">Root cause</div>
+          <div class="kv-val">${escapeHtml(match.rootCause || "") || "<span class='muted'>—</span>"}</div>
+        </div>
+
+        <div class="kv-row">
+          <div class="kv-key">Checklist</div>
+          <div class="kv-val">${checklistHtml}</div>
+        </div>
+
+        <div class="kv-row">
+          <div class="kv-key">If still not resolved</div>
+          <div class="kv-val">
+            <ol class="bullet-list">
+              <li>Try the “Solution” section in the issue details (if available).</li>
+              <li>Use <strong>Ask ChatGPT (copy prompt)</strong> to generate alternate steps.</li>
+              <li>Later: we can add “search the AD PDF” once you upload it into the repo.</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  const openBtn = document.getElementById("helpOpenIssueBtn");
+  openBtn?.addEventListener("click", () => {
+    setActiveTab("common");
+    showDetailScreen(match.id);
+  });
+}
+
+function buildChatGPTPrompt(userIssueText) {
+  const best = findBestCommonIssue(userIssueText);
+
+  const commonSnippet = best
+    ? `We found a likely matching internal common issue:\n- Issue: ${best.issueDescription || "—"}\n- Application: ${best.application || "—"}\n- Root cause: ${best.rootCause || "—"}\n- Checklist:\n${(best.checklistItems || []).map(x => `  - ${x}`).join("\n") || "  - (none)"}`
+    : `No internal common issue matched.`;
+
+  return `You are a support troubleshooting assistant. Create a clear, step-by-step troubleshooting guide for this issue:
+
+Issue reported:
+"${userIssueText}"
+
+Internal knowledge:
+${commonSnippet}
+
+Rules:
+1) If internal checklist exists, present it first as numbered steps.
+2) Then provide alternative steps (still concise).
+3) Ask for the minimum required missing details (environment, tenant, recent changes) only at the end.
+Output format:
+- Short summary
+- Step-by-step checklist
+- If unresolved: alternative steps
+- If still unresolved: what to ask from the customer next`;
+}
+
+async function copyToClipboard(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    alert("Copied to clipboard. Paste into ChatGPT to continue.");
+  } catch {
+    // Fallback
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand("copy");
+    ta.remove();
+    alert("Copied to clipboard. Paste into ChatGPT to continue.");
+  }
+}
+
+helpSearchBtn?.addEventListener("click", () => {
+  const q = (helpIssueInput?.value || "").trim();
+  const match = findBestCommonIssue(q);
+  renderHelpResult(match, q);
+});
+
+helpIssueInput?.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    helpSearchBtn?.click();
+  }
+});
+
+helpAskChatGPTBtn?.addEventListener("click", async () => {
+  const q = (helpIssueInput?.value || "").trim();
+  if (!q) {
+    alert("Please enter an issue description first.");
+    return;
+  }
+  const prompt = buildChatGPTPrompt(q);
+  await copyToClipboard(prompt);
 });
 
 /* =========
