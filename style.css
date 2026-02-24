@@ -34,7 +34,21 @@ body{
 .header-inner{
   max-width: 1100px;
   margin: 0 auto;
-  text-align: center;
+}
+.header-flex{
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.brand-logo{
+  height: 48px;   /* adjust if needed */
+  width: auto;
+  display: block;
+}
+
+.header-text h1{
+  margin: 0;
 }
 .site-header h1{
   margin: 0;
