@@ -82,6 +82,7 @@ Regards,`
 
 let issues = [];
 let selectedIssueId = null;
+
 let selectedTemplateIndex = 0;
 let templateState = structuredClone(DEFAULT_TEMPLATES);
 
@@ -138,14 +139,22 @@ async function loadIssuesFromFirestore() {
   const { collection, getDocs, query, orderBy } = window.firebaseFns;
 
   const colRef = collection(window.db, "issues");
-  const q = query(colRef, orderBy("createdAt", "desc"));
 
-  const snap = await getDocs(q);
-  issues = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  try {
+    // Preferred: sorted newest first
+    const q = query(colRef, orderBy("createdAt", "desc"));
+    const snap = await getDocs(q);
+    issues = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch (e) {
+    // Fallback: if some docs don't have createdAt or ordering fails
+    console.warn("OrderBy(createdAt) failed, falling back to unsorted getDocs()", e);
+    const snap = await getDocs(colRef);
+    issues = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  }
 
   renderIssueList();
 
-  // If we are currently in detail view, re-render selected issue
+  // If still in detail screen, refresh panel
   if (isInDetailScreen() && selectedIssueId) {
     renderSelectedIssueDetails();
   }
@@ -161,14 +170,11 @@ function setActiveTab(tab) {
   tabCommon.classList.toggle("active", isCommon);
   tabNew.classList.toggle("active", !isCommon);
 
-  // toggle sections
   commonSection.classList.toggle("hidden", !isCommon);
   newSection.classList.toggle("hidden", isCommon);
 
-  // Search applies mainly for common list, but you can keep it visible
   searchInput.style.display = isCommon ? "" : "none";
 
-  // If switching away, always go back to list screen for next time
   if (!isCommon) {
     showListScreen();
   }
@@ -178,7 +184,7 @@ tabCommon.addEventListener("click", () => setActiveTab("common"));
 tabNew.addEventListener("click", () => setActiveTab("new"));
 
 /* =========
-   Common Issues "Screens"
+   Common Issues screens
 ========= */
 
 function showListScreen() {
@@ -199,9 +205,7 @@ function isInDetailScreen() {
   return !commonDetailView.classList.contains("hidden");
 }
 
-backToListBtn.addEventListener("click", () => {
-  showListScreen();
-});
+backToListBtn.addEventListener("click", showListScreen);
 
 /* =========
    Application list
@@ -269,7 +273,7 @@ addTemplateBtn.addEventListener("click", () => {
 });
 
 /* =========
-   Common Issues list (ONLY list on first screen)
+   Common Issues list
 ========= */
 
 function getFilteredIssues() {
@@ -305,23 +309,18 @@ function renderIssueList() {
       <div class="issue-item-title">${escapeHtml(it.issueDescription || "Untitled issue")}</div>
       <div class="issue-item-sub">${escapeHtml(it.application || "")}</div>
     `;
-
-    li.addEventListener("click", () => {
-      showDetailScreen(it.id);
-    });
-
+    li.addEventListener("click", () => showDetailScreen(it.id));
     issueList.appendChild(li);
   });
 }
 
 searchInput.addEventListener("input", () => {
-  // If user is in detail screen and types search, keep it simple: go back to list
   if (isInDetailScreen()) showListScreen();
   renderIssueList();
 });
 
 /* =========
-   Details screen (full width)
+   Detail screen
 ========= */
 
 function findSelectedIssue() {
@@ -350,16 +349,13 @@ function renderSelectedIssueDetails() {
   issueDetailsPanel.innerHTML = `
     <div class="card details-card">
       <div class="card-head">
-        <div>
-          <div class="big-title">${escapeHtml(it.issueDescription || "Untitled issue")}</div>
-        </div>
+        <div class="big-title">${escapeHtml(it.issueDescription || "Untitled issue")}</div>
         <div class="card-actions">
           ${it.application ? `<span class="pill">${escapeHtml(it.application)}</span>` : ""}
           <button type="button" class="btn btn-secondary small" id="editIssueBtn">Edit</button>
         </div>
       </div>
 
-      <!-- VIEW -->
       <div id="detailsBodyView">
         <div class="kv">
           <div class="kv-row">
@@ -400,7 +396,6 @@ function renderSelectedIssueDetails() {
         </div>
       </div>
 
-      <!-- EDIT -->
       <div id="detailsBodyEdit" class="hidden">
         <div class="form-grid">
           <div class="form-row">
@@ -435,7 +430,7 @@ function renderSelectedIssueDetails() {
 
           <div class="form-row">
             <label>Email templates</label>
-            <small class="hint">For now, edit templates by creating a new issue entry (we can add template editing here next).</small>
+            <small class="hint">Template editing can be added here later (currently shown read-only).</small>
           </div>
         </div>
 
@@ -447,7 +442,7 @@ function renderSelectedIssueDetails() {
     </div>
   `;
 
-  // Template switching (detail screen)
+  // Template switching
   const detailsTabs = document.getElementById("detailsTemplateTabs");
   if (detailsTabs) {
     detailsTabs.addEventListener("click", (e) => {
@@ -460,12 +455,11 @@ function renderSelectedIssueDetails() {
 
       [...detailsTabs.querySelectorAll("button")].forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
-
       box.value = templates[idx]?.body || "";
     });
   }
 
-  // Edit toggle
+  // Edit toggles
   const editBtn = document.getElementById("editIssueBtn");
   const viewBody = document.getElementById("detailsBodyView");
   const editBody = document.getElementById("detailsBodyEdit");
@@ -488,7 +482,6 @@ function renderSelectedIssueDetails() {
       zendeskLink: (document.getElementById("editZendesk").value || "").trim(),
       solution: (document.getElementById("editSolution").value || "").trim()
     };
-
     await updateIssueInFirestore(it.id, updated);
   });
 }
@@ -497,15 +490,14 @@ async function updateIssueInFirestore(docId, updatedFields) {
   if (!ensureFirestoreReady()) return;
 
   const { doc, updateDoc, serverTimestamp } = window.firebaseFns;
-
   const ref = doc(window.db, "issues", docId);
+
   await updateDoc(ref, {
     ...updatedFields,
     updatedAt: serverTimestamp()
   });
 
   await loadIssuesFromFirestore();
-  // keep user in detail screen
   showDetailScreen(docId);
 }
 
@@ -576,7 +568,6 @@ saveIssueBtn.addEventListener("click", async () => {
 
 function init() {
   loadApplicationOptions();
-
   renderTemplateTabs();
   templateEditor.value = templateState[0].body;
 

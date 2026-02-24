@@ -1,22 +1,270 @@
-/* ===== Fix: your HTML now uses these correctly =====
-   (site-header, search-row, etc.)
-*/
+:root{
+  --bg: #f6f8fb;
+  --card: #ffffff;
+  --ink: #0f172a;
+  --muted: #5b677a;
+  --border: rgba(15,23,42,0.12);
+  --shadow: 0 12px 30px rgba(15,23,42,0.10);
+  --nav: #233247;
+  --nav2: #2c3d55;
 
-/* Section visibility */
-.section.hidden { display: none !important; }
+  --primary: #0f172a;
+  --primary2: #111c33;
 
-/* Common Issues screens */
-#commonListView { display: block; }
-#commonDetailView { display: block; }
-
-/* Make detail page feel like a new "screen" */
-#commonDetailView .card {
-  min-height: 420px;
+  --radius: 18px;
 }
 
-/* Buttons (you already have .btn etc; ensure New Issues buttons look right) */
-.secondary-btn, .primary-btn {
-  /* fallback: if any old class remains */
+*{ box-sizing: border-box; }
+
+body{
+  margin:0;
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Apple Color Emoji","Segoe UI Emoji";
+  color: var(--ink);
+  background: var(--bg);
+}
+
+/* IMPORTANT: your JS depends on this */
+.hidden{ display:none !important; }
+
+.site-header{
+  background: linear-gradient(180deg, var(--nav), var(--nav2));
+  padding: 56px 18px 28px;
+  color: #fff;
+}
+.header-inner{
+  max-width: 1100px;
+  margin: 0 auto;
+  text-align: center;
+}
+.site-header h1{
+  margin: 0;
+  font-size: 42px;
+  letter-spacing: 0.2px;
+}
+.site-header p{
+  margin: 10px 0 0;
+  opacity: 0.92;
+  font-size: 16px;
+}
+
+.page{
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 22px 18px 44px;
+}
+
+.top-tabs{
+  display:flex;
+  gap: 12px;
+  justify-content: center;
+  margin-top: -26px;
+  margin-bottom: 16px;
+}
+.tab-btn{
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.95);
+  padding: 12px 18px;
+  border-radius: 14px;
+  cursor: pointer;
+  font-weight: 700;
+  min-width: 190px;
+  box-shadow: 0 10px 22px rgba(15,23,42,0.08);
+}
+.tab-btn.active{
+  background: #eef3ff;
+  border-color: rgba(59,130,246,0.25);
+}
+
+.search-row{
+  display:flex;
+  justify-content: center;
+  margin: 14px 0 24px;
+}
+.search-input{
+  width: min(780px, 100%);
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  outline: none;
+  font-size: 16px;
+  background: rgba(255,255,255,0.98);
+}
+.search-input:focus{
+  border-color: rgba(59,130,246,0.35);
+  box-shadow: 0 0 0 4px rgba(59,130,246,0.12);
+}
+
+.section-title{
+  text-align: left;
+  margin-bottom: 14px;
+}
+.section-title h2{
+  margin: 0 0 6px;
+  font-size: 32px;
+}
+.muted{ color: var(--muted); }
+
+.card{
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.card-head{
+  display:flex;
+  align-items:center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(15,23,42,0.02);
+}
+.card-title{
+  margin:0;
+  font-size: 16px;
+  font-weight: 800;
+}
+.card-actions{
+  display:flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.list-card{ min-height: 420px; }
+.details-card{ min-height: 420px; }
+
+.pill{
+  display:inline-flex;
+  align-items:center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  font-size: 13px;
+  background: rgba(15,23,42,0.03);
+}
+.muted-pill{ color: var(--muted); }
+
+.issue-list{
+  list-style: none;
+  padding: 10px;
+  margin: 0;
+  display:flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.issue-item{
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 12px 12px;
+  cursor: pointer;
+  background: rgba(255,255,255,0.98);
+  transition: transform 0.08s ease, box-shadow 0.08s ease, border-color 0.08s ease;
+}
+.issue-item:hover{
+  transform: translateY(-1px);
+  box-shadow: 0 10px 18px rgba(15,23,42,0.10);
+  border-color: rgba(59,130,246,0.22);
+}
+.issue-item-title{
+  font-weight: 800;
+  margin: 0 0 6px;
+}
+.issue-item-sub{
+  color: var(--muted);
+  font-size: 13px;
+  margin: 0;
+}
+.empty-state{ padding: 16px; }
+
+.big-title{
+  margin: 0;
+  font-size: 26px;
+  letter-spacing: 0.2px;
+}
+
+.kv{
+  padding: 12px 16px 18px;
+}
+.kv-row{
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+}
+.kv-row:first-child{ border-top: none; }
+.kv-key{
+  font-weight: 800;
+  margin-bottom: 6px;
+}
+.kv-val{ color: var(--ink); }
+.prewrap{ white-space: pre-wrap; }
+
+.bullet-list{
+  margin: 0;
+  padding-left: 18px;
+}
+
+.link{
+  color: #1d4ed8;
+  text-decoration: none;
+  font-weight: 700;
+}
+.link:hover{ text-decoration: underline; }
+
+.form-card{ padding: 12px; }
+.form-grid{
+  padding: 12px 10px;
+  display: grid;
+  gap: 14px;
+}
+.form-row label{
+  display:block;
+  font-weight: 800;
+  margin-bottom: 8px;
+}
+.form-row input,
+.form-row textarea,
+.form-row select{
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 12px 14px;
+  font-size: 15px;
+  outline: none;
+  background: rgba(255,255,255,0.98);
+}
+.form-row textarea{ resize: vertical; }
+.form-row input:focus,
+.form-row textarea:focus,
+.form-row select:focus{
+  border-color: rgba(59,130,246,0.35);
+  box-shadow: 0 0 0 4px rgba(59,130,246,0.12);
+}
+.hint{
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.inline-row{
+  display:flex;
+  gap: 10px;
+  align-items: center;
+}
+.inline-row select{ flex: 1; }
+
+.row-between{
+  display:flex;
+  align-items:center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.form-actions{
+  padding: 0 10px 14px;
+  display:flex;
+  gap: 10px;
+}
+
+.btn{
   border: 1px solid var(--border);
   border-radius: 14px;
   padding: 12px 16px;
@@ -24,29 +272,69 @@
   font-weight: 800;
   background: #fff;
 }
-.primary-btn { background: var(--primary); color:#fff; }
-.secondary-btn { background: rgba(15,23,42,0.04); }
-
-/* Make issue list rows match your existing style expectations */
-.issue-row, .issue-item {
-  width: 100%;
-  text-align: left;
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 12px 12px;
-  cursor: pointer;
-  background: rgba(255,255,255,0.98);
+.btn.small{
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-weight: 800;
+}
+.btn-primary{
+  background: var(--primary);
+  color: #fff;
+  border-color: rgba(255,255,255,0.12);
+}
+.btn-primary:hover{ background: var(--primary2); }
+.btn-secondary{
+  background: rgba(15,23,42,0.04);
+}
+.btn-secondary:hover{
+  background: rgba(15,23,42,0.07);
 }
 
-/* Detail page template box: same feel/width as New Issues */
-.details-template-editor {
-  width: 100%;
-  min-height: 220px;
+.template-tabs{
+  display:flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.template-tab{
+  border: 1px solid var(--border);
+  padding: 8px 10px;
+  border-radius: 999px;
+  cursor:pointer;
+  font-weight: 800;
+  background: rgba(255,255,255,0.98);
+}
+.template-tab.active{
+  background: #eef3ff;
+  border-color: rgba(59,130,246,0.30);
+}
+
+.template-editor{
+  width:100%;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* Detail page template editor matches New Issues sizing */
+.details-template-editor{
+  width:100%;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 13px;
+  line-height: 1.5;
   border: 1px solid var(--border);
   border-radius: 14px;
   padding: 12px 14px;
   background: rgba(255,255,255,0.98);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-  font-size: 13px;
-  line-height: 1.5;
+  min-height: 260px; /* make it feel like New Issues */
+  resize: vertical;
+}
+
+.site-footer{
+  background: #2c3d55;
+  color: #fff;
+  text-align:center;
+  padding: 18px;
+  font-weight: 700;
+  opacity: 0.95;
 }

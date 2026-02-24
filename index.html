@@ -4,11 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Troubleshooting Checklist Portal</title>
- <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css" />
 </head>
 
 <body>
-  <!-- Header (matches your CSS classes) -->
   <header class="site-header">
     <div class="header-inner">
       <h1>Troubleshooting Checklist Portal</h1>
@@ -17,13 +16,11 @@
   </header>
 
   <main class="page">
-    <!-- Tabs -->
     <div class="top-tabs">
       <button id="tabCommon" class="tab-btn active" type="button">Common Issues</button>
       <button id="tabNew" class="tab-btn" type="button">New Issues</button>
     </div>
 
-    <!-- Search (matches your CSS classes) -->
     <div class="search-row">
       <input
         id="searchInput"
@@ -48,19 +45,16 @@
             <div class="card-title">Issues</div>
             <div class="pill muted-pill" id="issuesCountPill">0</div>
           </div>
-
-          <!-- IMPORTANT: this is a UL because your CSS is for .issue-list list-style:none -->
           <ul class="issue-list" id="issueList"></ul>
         </div>
       </div>
 
-      <!-- DETAIL SCREEN (hidden until you click an issue) -->
+      <!-- DETAIL SCREEN -->
       <div id="commonDetailView" class="hidden">
         <div class="row-between" style="margin-bottom: 12px;">
           <button id="backToListBtn" type="button" class="btn btn-secondary small">← Back</button>
           <span class="pill muted-pill">Issue Details</span>
         </div>
-
         <div id="issueDetailsPanel"></div>
       </div>
     </section>
@@ -179,9 +173,8 @@
       orderBy
     };
 
-    // Load script.js only after Firebase globals exist
     const s = document.createElement("script");
-    s.src = "script.js?v=4";
+    s.src = "script.js?v=10";
     document.body.appendChild(s);
   </script>
 </body>
