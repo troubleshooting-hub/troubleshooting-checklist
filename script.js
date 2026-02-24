@@ -576,5 +576,41 @@ function init() {
 
   loadIssuesFromFirestore();
 }
+const themeToggle = document.getElementById("themeToggle");
 
-init();
+function applySavedTheme() {
+  const saved = localStorage.getItem("theme");
+  if (saved === "light") {
+    document.documentElement.classList.add("light-theme");
+    if (themeToggle) themeToggle.textContent = "🌙";
+  } else {
+    // default = dark
+    document.documentElement.classList.remove("light-theme");
+    if (themeToggle) themeToggle.textContent = "☀️";
+  }
+}
+
+if (themeToggle) {
+  themeToggle.addEventListener("click", () => {
+    const isLight = document.documentElement.classList.toggle("light-theme");
+
+    if (isLight) {
+      localStorage.setItem("theme", "light");
+      themeToggle.textContent = "🌙";
+    } else {
+      localStorage.setItem("theme", "dark");
+      themeToggle.textContent = "☀️";
+    }
+  });
+}
+function init() {
+  applySavedTheme();
+  loadApplicationOptions();
+  renderTemplateTabs();
+  templateEditor.value = templateState[0].body;
+
+  setActiveTab("common");
+  showListScreen();
+
+  loadIssuesFromFirestore();
+}
