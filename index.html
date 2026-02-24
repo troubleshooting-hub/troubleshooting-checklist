@@ -3,8 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+
+  <!-- CRITICAL for GitHub Pages repo sites -->
+  <base href="/troubleshooting-checklist/">
+
   <title>Troubleshooting Checklist Portal</title>
-  <link rel="stylesheet" href="style.css" />
+
+  <!-- Use absolute path under the repo -->
+  <link rel="stylesheet" href="/troubleshooting-checklist/style.css?v=20" />
 </head>
 
 <body>
@@ -132,6 +138,16 @@
     Internal Use Only | Troubleshooting Portal
   </footer>
 
+  <!-- quick sanity check: if CSS didn’t load, body bg will still be white -->
+  <script>
+    window.addEventListener("load", () => {
+      const bg = getComputedStyle(document.body).backgroundColor;
+      if (bg === "rgba(0, 0, 0, 0)" || bg === "rgb(255, 255, 255)") {
+        console.warn("CSS probably did not load. Check /troubleshooting-checklist/style.css");
+      }
+    });
+  </script>
+
   <!-- Firebase Setup -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
@@ -173,8 +189,10 @@
       orderBy
     };
 
+    // Load script.js only after Firebase globals exist
     const s = document.createElement("script");
-    s.src = "script.js?v=10";
+    s.src = "/troubleshooting-checklist/script.js?v=20";
+    s.defer = true;
     document.body.appendChild(s);
   </script>
 </body>
