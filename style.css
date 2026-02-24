@@ -14,7 +14,8 @@
 
   --radius: 16px;
 }
-html.light-theme{  --bg: #f4f6f9;
+.light-theme{
+  --bg: #f4f6f9;
   --card: #ffffff;
   --ink: #0f172a;
   --muted: #64748b;
@@ -185,7 +186,8 @@ body{
   border-radius: 14px;
   padding: 12px 12px;
   cursor: pointer;
-  background: rgba(255,255,255,0.98);
+  background: var(--card);
+  color: var(--ink);
   transition: transform 0.08s ease, box-shadow 0.08s ease, border-color 0.08s ease;
 }
 .issue-item:hover{
