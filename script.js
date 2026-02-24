@@ -566,20 +566,12 @@ saveIssueBtn.addEventListener("click", async () => {
    Init
 ========= */
 
-function init() {
-  loadApplicationOptions();
-  renderTemplateTabs();
-  templateEditor.value = templateState[0].body;
-
-  setActiveTab("common");
-  showListScreen();
-
-  loadIssuesFromFirestore();
-}
+// Theme toggle
 const themeToggle = document.getElementById("themeToggle");
 
 function applySavedTheme() {
   const saved = localStorage.getItem("theme");
+
   if (saved === "light") {
     document.documentElement.classList.add("light-theme");
     if (themeToggle) themeToggle.textContent = "🌙";
@@ -603,6 +595,8 @@ if (themeToggle) {
     }
   });
 }
+
+// App init (ONLY ONCE)
 function init() {
   applySavedTheme();
   loadApplicationOptions();
@@ -614,3 +608,5 @@ function init() {
 
   loadIssuesFromFirestore();
 }
+
+init();
