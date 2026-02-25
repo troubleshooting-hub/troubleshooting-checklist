@@ -10,7 +10,7 @@
   <title>Troubleshooting Checklist Portal</title>
 
   <!-- Use absolute path under the repo -->
-  <link rel="stylesheet" href="style.css?v=21" />
+  <link rel="stylesheet" href="style.css?v=30" />
 </head>
 
 <body>
@@ -27,253 +27,306 @@
       <p>Internal Support & Investigation Guide</p>
     </div>
 
-    <button id="themeToggle" class="theme-toggle" type="button">
+    <button id="themeToggle" class="theme-toggle" type="button" aria-label="Toggle theme">
       ☀️
     </button>
-
   </div>
 </header>
 
-  <main class="page">
-    <div class="top-tabs">
-      <button id="tabCommon" class="tab-btn active" type="button">Common Issues</button>
-      <button id="tabNew" class="tab-btn" type="button">New Issues</button>
-      <button id="tabHelp" class="tab-btn" type="button">Help me troubleshoot</button>
+<main class="page">
+  <div class="top-tabs">
+    <button id="tabCommon" class="tab-btn active" type="button">Common Issues</button>
+    <button id="tabNew" class="tab-btn" type="button">New Issues</button>
+    <button id="tabHelp" class="tab-btn" type="button">Help me troubleshoot</button>
+  </div>
+
+  <div class="search-row">
+    <input
+      id="searchInput"
+      class="search-input"
+      type="text"
+      placeholder="Search issues (ex: 409, Azure AD, Okta)..."
+      autocomplete="off"
+    />
+  </div>
+
+  <!-- COMMON ISSUES -->
+  <section id="commonSection" class="section">
+    <div class="section-title">
+      <h2>Common Issues</h2>
+      <div class="muted">Saved issues will appear here. Use search above to filter.</div>
     </div>
 
-    <div class="search-row">
-      <input
-        id="searchInput"
-        class="search-input"
-        type="text"
-        placeholder="Search issues (ex: 409, Azure AD, Okta)..."
-        autocomplete="off"
-      />
+    <!-- LIST SCREEN -->
+    <div id="commonListView">
+      <div class="card list-card">
+        <div class="card-head">
+          <div class="card-title">Issues</div>
+          <div class="pill muted-pill" id="issuesCountPill">0</div>
+        </div>
+        <ul class="issue-list" id="issueList"></ul>
+      </div>
     </div>
 
-    <!-- COMMON ISSUES -->
-    <section id="commonSection" class="section">
-      <div class="section-title">
-        <h2>Common Issues</h2>
-        <div class="muted">Saved issues will appear here. Use search above to filter.</div>
+    <!-- DETAIL SCREEN -->
+    <div id="commonDetailView" class="hidden">
+      <div class="row-between" style="margin-bottom: 12px;">
+        <button id="backToListBtn" type="button" class="btn btn-secondary small">← Back</button>
+        <span class="pill muted-pill">Issue Details</span>
       </div>
+      <div id="issueDetailsPanel"></div>
+    </div>
+  </section>
 
-      <!-- LIST SCREEN -->
-      <div id="commonListView">
-        <div class="card list-card">
-          <div class="card-head">
-            <div class="card-title">Issues</div>
-            <div class="pill muted-pill" id="issuesCountPill">0</div>
-          </div>
-          <ul class="issue-list" id="issueList"></ul>
+  <!-- NEW ISSUES -->
+  <section id="newSection" class="section hidden">
+    <div class="section-title">
+      <h2>Add New Issue Checklist</h2>
+      <div class="muted">Fill the form, then click Save. It will show up in Common Issues.</div>
+    </div>
+
+    <div class="card form-card">
+      <div class="form-grid">
+
+        <div class="form-row">
+          <label for="issueDescription">Issue Description</label>
+          <input id="issueDescription" type="text" placeholder='Example: "409 DN already exists"' />
         </div>
-      </div>
 
-      <!-- DETAIL SCREEN -->
-      <div id="commonDetailView" class="hidden">
-        <div class="row-between" style="margin-bottom: 12px;">
-          <button id="backToListBtn" type="button" class="btn btn-secondary small">← Back</button>
-          <span class="pill muted-pill">Issue Details</span>
-        </div>
-        <div id="issueDetailsPanel"></div>
-      </div>
-    </section>
-
-    <!-- NEW ISSUES -->
-    <section id="newSection" class="section hidden">
-      <div class="section-title">
-        <h2>Add New Issue Checklist</h2>
-        <div class="muted">Fill the form, then click Save. It will show up in Common Issues.</div>
-      </div>
-
-      <div class="card form-card">
-        <div class="form-grid">
-
-          <div class="form-row">
-            <label for="issueDescription">Issue Description</label>
-            <input id="issueDescription" type="text" placeholder='Example: "409 Error"' />
+        <div class="form-row">
+          <label>Application</label>
+          <div class="inline-row">
+            <select id="applicationSelect">
+              <option value="">Select application</option>
+            </select>
+            <button id="addNewAppBtn" type="button" class="btn btn-secondary small">+ Add new application</button>
           </div>
+          <small class="hint">Choose from the list or add a new one.</small>
+        </div>
 
-          <div class="form-row">
-            <label>Application</label>
-            <div class="inline-row">
-              <select id="applicationSelect">
-                <option value="">Select application</option>
-              </select>
-              <button id="addNewAppBtn" type="button" class="btn btn-secondary small">+ Add new application</button>
+        <div class="form-row">
+          <label for="rootCause">Root Cause</label>
+          <input id="rootCause" type="text" />
+        </div>
+
+        <div class="form-row">
+          <label for="checklists">Checklists (bullet points)</label>
+          <textarea id="checklists" rows="6"></textarea>
+          <small class="hint">One line = one bullet point.</small>
+        </div>
+
+        <div class="form-row">
+          <label for="zendeskLink">Zendesk Ticket Link</label>
+          <input id="zendeskLink" type="url" />
+        </div>
+
+        <div class="form-row">
+          <label for="solution">Solution</label>
+          <textarea id="solution" rows="5"></textarea>
+        </div>
+
+        <div class="form-row">
+          <label>Ready-Made Email Templates</label>
+          <div class="template-tabs" id="templateTabs"></div>
+          <textarea id="templateEditor" class="template-editor" rows="10"></textarea>
+
+          <div class="row-between" style="margin-top:10px;">
+            <button id="addTemplateBtn" type="button" class="btn btn-secondary small">+ Add template</button>
+            <small class="hint">You can edit the template text before saving.</small>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="form-actions">
+        <button id="saveIssueBtn" type="button" class="btn btn-primary">Save</button>
+        <button id="resetIssueBtn" type="button" class="btn btn-secondary">Reset</button>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- HELP ME TROUBLESHOOT (NEW FLOW) -->
+  <section id="helpSection" class="section hidden">
+    <div class="section-title">
+      <h2>Help Me Troubleshoot</h2>
+      <div class="muted">
+        Paste what you already checked. We’ll compare it to the standard checklist and guide you to the next step.
+      </div>
+    </div>
+
+    <div class="card form-card">
+      <div class="form-grid">
+
+        <!-- Step 0: Issue -->
+        <div class="form-row">
+          <label for="helpIssueInput">Issue description</label>
+          <input
+            id="helpIssueInput"
+            type="text"
+            placeholder='Example: "409 DN already exists"'
+            autocomplete="off"
+          />
+          <small class="hint">Tip: include the system name (e.g., Active Directory / Azure AD) and keywords (DN / UPN / attribute).</small>
+        </div>
+
+        <!-- Step 1: What user already checked -->
+        <div class="form-row">
+          <label for="helpCheckedInput">I have checked the following:</label>
+          <textarea
+            id="helpCheckedInput"
+            rows="8"
+            placeholder="One line = one completed check. Do not include steps you did not perform."
+          ></textarea>
+          <small class="hint">Do not assume anything. Only include what you explicitly checked.</small>
+        </div>
+
+        <div class="row-between">
+          <button id="helpAnalyzeBtn" type="button" class="btn btn-primary">
+            Analyze my checklist
+          </button>
+          <button id="helpClearBtn" type="button" class="btn btn-secondary">
+            Clear
+          </button>
+        </div>
+
+        <!-- Results container (Step 1 output + Step 2 + Step 3) -->
+        <div id="helpResults" class="muted">
+          Enter an issue above, paste what you checked, and click “Analyze my checklist”.
+        </div>
+
+        <!-- Step 2: Documentation (hidden until needed) -->
+        <div id="helpStep2" class="hidden">
+          <div class="kv" style="padding: 0 10px 0;">
+            <div class="kv-row">
+              <div class="kv-key">Step 2 — Documentation</div>
+              <div class="kv-val">
+                Kindly refer to the Active Directory troubleshooting documentation:
+                <a
+                  id="helpDocLink"
+                  class="link"
+                  href="https://support.aquera.com/hc/en-us/articles/360052131934-Active-Directory-AD-Configuration-Guide#h_01F8CDRHWA2JG6V2DE0RCJK6VP"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Open documentation
+                </a>
+              </div>
+              <div class="kv-val muted" style="margin-top:8px;">
+                After reviewing, click the button below to continue.
+              </div>
             </div>
-            <small class="hint">Choose from the list or add a new one.</small>
-          </div>
 
-          <div class="form-row">
-            <label for="rootCause">Root Cause</label>
-            <input id="rootCause" type="text" />
-          </div>
-
-          <div class="form-row">
-            <label for="checklists">Checklists (bullet points)</label>
-            <textarea id="checklists" rows="6"></textarea>
-            <small class="hint">One line = one bullet point.</small>
-          </div>
-
-          <div class="form-row">
-            <label for="zendeskLink">Zendesk Ticket Link</label>
-            <input id="zendeskLink" type="url" />
-          </div>
-
-          <div class="form-row">
-            <label for="solution">Solution</label>
-            <textarea id="solution" rows="5"></textarea>
-          </div>
-
-          <div class="form-row">
-            <label>Ready-Made Email Templates</label>
-            <div class="template-tabs" id="templateTabs"></div>
-            <textarea id="templateEditor" class="template-editor" rows="10"></textarea>
-
-            <div class="row-between" style="margin-top:10px;">
-              <button id="addTemplateBtn" type="button" class="btn btn-secondary small">+ Add template</button>
-              <small class="hint">You can edit the template text before saving.</small>
-            </div>
-          </div>
-
-        </div>
-
-        <div class="form-actions">
-          <button id="saveIssueBtn" type="button" class="btn btn-primary">Save</button>
-          <button id="resetIssueBtn" type="button" class="btn btn-secondary">Reset</button>
-        </div>
-
-      </div>
-    </section>
-
-    <!-- HELP ME TROUBLESHOOT (NEW FLOW — NO AI CALLS) -->
-    <section id="helpSection" class="section hidden">
-      <div class="section-title">
-        <h2>Help Me Troubleshoot</h2>
-        <div class="muted">
-          Paste what you already checked. We’ll compare it to the standard checklist and guide you to the next step.
-        </div>
-      </div>
-
-      <div class="card form-card">
-        <div class="form-grid">
-
-          <div class="form-row">
-            <label for="helpIssueInput">Issue description</label>
-            <input
-              id="helpIssueInput"
-              type="text"
-              placeholder='Example: "409 error: User Principal Name already exists (Active Directory)"'
-            />
-            <small class="hint">Tip: include the system name (e.g., Active Directory / Azure AD).</small>
-          </div>
-
-          <div class="form-row">
-            <label for="helpCheckedInput">I have checked the following:</label>
-            <textarea
-              id="helpCheckedInput"
-              rows="9"
-              placeholder="Paste your completed checks here (one per line)."
-            ></textarea>
-            <small class="hint">One line = one completed check. Do not include steps you did not perform.</small>
-          </div>
-
-          <div class="row-between">
-            <button id="helpAnalyzeBtn" type="button" class="btn btn-primary">
-              Analyze my checklist
-            </button>
-            <button id="helpClearBtn" type="button" class="btn btn-secondary">
-              Clear
-            </button>
-          </div>
-
-          <div id="helpResults" class="muted">
-            Enter an issue + your completed checks, then click “Analyze my checklist”.
-          </div>
-
-          <!-- Step 2 / 3 controls (hidden until needed) -->
-          <div id="helpNextActions" class="hidden">
-            <div class="row-between" style="margin-top: 8px;">
-              <button id="helpDocsReviewedBtn" type="button" class="btn btn-secondary">
+            <div class="form-actions" style="padding: 0 0 14px; gap: 10px;">
+              <button id="helpDocCheckedBtn" type="button" class="btn btn-secondary">
                 I have checked the documentation — still no luck.
               </button>
-
-              <button id="helpGeneratePromptBtn" type="button" class="btn btn-primary">
-                Generate ChatGPT-ready prompt
-              </button>
             </div>
-            <small class="hint">
-              Use the documentation button only after you have checked every item. Use the prompt button after documentation also didn’t help.
-            </small>
           </div>
-
         </div>
+
+        <!-- Step 3: Prompt builder (hidden until doc button clicked) -->
+        <div id="helpStep3" class="hidden">
+          <div class="kv" style="padding: 0 10px 0;">
+            <div class="kv-row">
+              <div class="kv-key">Step 3 — ChatGPT-ready prompt</div>
+              <div class="kv-val">
+                <div class="pill" style="margin-bottom:10px;">
+                  Hey, no worries. I will create a ChatGPT-ready prompt that you can paste directly into ChatGPT.
+                </div>
+
+                <textarea
+                  id="helpPromptOutput"
+                  class="details-template-editor"
+                  rows="12"
+                  readonly
+                ></textarea>
+
+                <div class="hint" style="margin-top:10px;">
+                  Remember to attach these in ChatGPT for better analysis:
+                  <ul class="bullet-list" style="margin-top:6px;">
+                    <li>Relevant integration log.txt files</li>
+                    <li>Relevant application log.txt files</li>
+                    <li>The integration / customer script JSON file</li>
+                    <li>Ticket details (error code, timestamps, affected user, environment)</li>
+                  </ul>
+                </div>
+
+                <div class="form-actions" style="padding: 10px 0 14px; gap: 10px;">
+                  <button id="helpCopyPromptBtn" type="button" class="btn btn-primary">Copy prompt</button>
+                  <button id="helpResetFlowBtn" type="button" class="btn btn-secondary">Start over</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
       </div>
-    </section>
+    </div>
+  </section>
 
-  </main>
+</main>
 
-  <footer class="site-footer">
-    Internal Use Only | Troubleshooting Portal
-  </footer>
+<footer class="site-footer">
+  Internal Use Only | Troubleshooting Portal
+</footer>
 
-  <!-- quick sanity check: if CSS didn’t load, body bg will still be white -->
-  <script>
-    window.addEventListener("load", () => {
-      const bg = getComputedStyle(document.body).backgroundColor;
-      if (bg === "rgba(0, 0, 0, 0)" || bg === "rgb(255, 255, 255)") {
-        console.warn("CSS probably did not load. Check /troubleshooting-checklist/style.css");
-      }
-    });
-  </script>
+<!-- quick sanity check: if CSS didn’t load, body bg will still be white -->
+<script>
+  window.addEventListener("load", () => {
+    const bg = getComputedStyle(document.body).backgroundColor;
+    if (bg === "rgba(0, 0, 0, 0)" || bg === "rgb(255, 255, 255)") {
+      console.warn("CSS probably did not load. Check /troubleshooting-checklist/style.css");
+    }
+  });
+</script>
 
-  <!-- Firebase Setup -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
-    import {
-      getFirestore,
-      collection,
-      addDoc,
-      getDocs,
-      doc,
-      updateDoc,
-      deleteDoc,
-      serverTimestamp,
-      query,
-      orderBy
-    } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
+<!-- Firebase Setup -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
+  import {
+    getFirestore,
+    collection,
+    addDoc,
+    getDocs,
+    doc,
+    updateDoc,
+    deleteDoc,
+    serverTimestamp,
+    query,
+    orderBy
+  } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyC7hu52JLlf9_IA0UA10RaIRiWaoWhIpr8",
-      authDomain: "troubleshooting-hub.firebaseapp.com",
-      projectId: "troubleshooting-hub",
-      storageBucket: "troubleshooting-hub.firebasestorage.app",
-      messagingSenderId: "725774852364",
-      appId: "1:725774852364:web:5c16dcaffa96a5b7ab6929"
-    };
+  const firebaseConfig = {
+    apiKey: "AIzaSyC7hu52JLlf9_IA0UA10RaIRiWaoWhIpr8",
+    authDomain: "troubleshooting-hub.firebaseapp.com",
+    projectId: "troubleshooting-hub",
+    storageBucket: "troubleshooting-hub.firebasestorage.app",
+    messagingSenderId: "725774852364",
+    appId: "1:725774852364:web:5c16dcaffa96a5b7ab6929"
+  };
 
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
 
-    window.db = db;
-    window.firebaseFns = {
-      collection,
-      addDoc,
-      getDocs,
-      doc,
-      updateDoc,
-      deleteDoc,
-      serverTimestamp,
-      query,
-      orderBy
-    };
+  window.db = db;
+  window.firebaseFns = {
+    collection,
+    addDoc,
+    getDocs,
+    doc,
+    updateDoc,
+    deleteDoc,
+    serverTimestamp,
+    query,
+    orderBy
+  };
 
-    // Load script.js only after Firebase globals exist
-    const s = document.createElement("script");
-    s.src = "/troubleshooting-checklist/script.js?v=21";
-    s.defer = true;
-    document.body.appendChild(s);
-  </script>
+  // Load script.js only after Firebase globals exist
+  const s = document.createElement("script");
+  s.src = "/troubleshooting-checklist/script.js?v=30";
+  s.defer = true;
+  document.body.appendChild(s);
+</script>
 </body>
 </html>
