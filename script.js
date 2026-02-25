@@ -20,13 +20,20 @@ function linesToBullets(text = "") {
 
 function bulletsToHtml(items = []) {
   if (!items.length) return "<div class='muted'>No checklist items.</div>";
-  return `<ul class="bullet-list">${items.map(li => `<li>${escapeHtml(li)}</li>`).join("")}</ul>`;
+  return `<ul class="bullet-list">${items
+    .map(li => `<li>${escapeHtml(li)}</li>`)
+    .join("")}</ul>`;
 }
 
 function safeUrl(url) {
   const u = (url || "").trim();
   if (!u) return "";
-  try { new URL(u); return u; } catch { return ""; }
+  try {
+    new URL(u);
+    return u;
+  } catch {
+    return "";
+  }
 }
 
 /* =========
@@ -34,14 +41,19 @@ function safeUrl(url) {
 ========= */
 
 const DEFAULT_APPS = [
-  "Active Directory", "Azure AD", "Okta", "ADP", "Paycor", "Dayforce", "Paylocity"
+  "Active Directory",
+  "Azure AD",
+  "Okta",
+  "ADP",
+  "Paycor",
+  "Dayforce",
+  "Paylocity"
 ];
 
 const DEFAULT_TEMPLATES = [
   {
     name: "Template 1",
-    body:
-`Subject: Update on your issue
+    body: `Subject: Update on your issue
 
 Hi there,
 
@@ -52,8 +64,7 @@ Regards,`
   },
   {
     name: "Template 2",
-    body:
-`Subject: Request for additional details
+    body: `Subject: Request for additional details
 
 Hi there,
 
@@ -68,8 +79,7 @@ Regards,`
   },
   {
     name: "Template 3",
-    body:
-`Subject: Issue resolved
+    body: `Subject: Issue resolved
 
 Hi there,
 
@@ -146,7 +156,6 @@ async function loadIssuesFromFirestore() {
   if (!ensureFirestoreReady()) return;
 
   const { collection, getDocs, query, orderBy } = window.firebaseFns;
-
   const colRef = collection(window.db, "issues");
 
   try {
@@ -178,16 +187,16 @@ function setActiveTab(tab) {
   const isNew = tab === "new";
   const isHelp = tab === "help";
 
-  tabCommon.classList.toggle("active", isCommon);
-  tabNew.classList.toggle("active", isNew);
-  tabHelp.classList.toggle("active", isHelp);
+  tabCommon?.classList.toggle("active", isCommon);
+  tabNew?.classList.toggle("active", isNew);
+  tabHelp?.classList.toggle("active", isHelp);
 
-  commonSection.classList.toggle("hidden", !isCommon);
-  newSection.classList.toggle("hidden", !isNew);
-  helpSection.classList.toggle("hidden", !isHelp);
+  commonSection?.classList.toggle("hidden", !isCommon);
+  newSection?.classList.toggle("hidden", !isNew);
+  helpSection?.classList.toggle("hidden", !isHelp);
 
   // Search bar only for Common
-  searchInput.style.display = isCommon ? "" : "none";
+  if (searchInput) searchInput.style.display = isCommon ? "" : "none";
 
   // Leaving Common should reset its detail view
   if (!isCommon) {
@@ -195,39 +204,41 @@ function setActiveTab(tab) {
   }
 }
 
-tabCommon.addEventListener("click", () => setActiveTab("common"));
-tabNew.addEventListener("click", () => setActiveTab("new"));
-tabHelp.addEventListener("click", () => setActiveTab("help"));
+tabCommon?.addEventListener("click", () => setActiveTab("common"));
+tabNew?.addEventListener("click", () => setActiveTab("new"));
+tabHelp?.addEventListener("click", () => setActiveTab("help"));
 
 /* =========
    Common Issues screens
 ========= */
 
 function showListScreen() {
-  commonListView.classList.remove("hidden");
-  commonDetailView.classList.add("hidden");
-  issueDetailsPanel.innerHTML = "";
+  commonListView?.classList.remove("hidden");
+  commonDetailView?.classList.add("hidden");
+  if (issueDetailsPanel) issueDetailsPanel.innerHTML = "";
   selectedIssueId = null;
 }
 
 function showDetailScreen(issueId) {
   selectedIssueId = issueId;
-  commonListView.classList.add("hidden");
-  commonDetailView.classList.remove("hidden");
+  commonListView?.classList.add("hidden");
+  commonDetailView?.classList.remove("hidden");
   renderSelectedIssueDetails();
 }
 
 function isInDetailScreen() {
-  return !commonDetailView.classList.contains("hidden");
+  return commonDetailView ? !commonDetailView.classList.contains("hidden") : false;
 }
 
-backToListBtn.addEventListener("click", showListScreen);
+backToListBtn?.addEventListener("click", showListScreen);
 
 /* =========
    Application list
 ========= */
 
 function loadApplicationOptions() {
+  if (!applicationSelect) return;
+
   applicationSelect.innerHTML = `<option value="">Select application</option>`;
   DEFAULT_APPS.forEach(app => {
     const opt = document.createElement("option");
@@ -237,10 +248,10 @@ function loadApplicationOptions() {
   });
 }
 
-addNewAppBtn.addEventListener("click", () => {
+addNewAppBtn?.addEventListener("click", () => {
   const name = prompt("Enter new application name:");
   const cleaned = (name || "").trim();
-  if (!cleaned) return;
+  if (!cleaned || !applicationSelect) return;
 
   const opt = document.createElement("option");
   opt.value = cleaned;
@@ -254,6 +265,8 @@ addNewAppBtn.addEventListener("click", () => {
 ========= */
 
 function renderTemplateTabs() {
+  if (!templateTabs || !templateEditor) return;
+
   templateTabs.innerHTML = "";
 
   templateState.forEach((t, idx) => {
@@ -273,7 +286,9 @@ function renderTemplateTabs() {
   });
 }
 
-addTemplateBtn.addEventListener("click", () => {
+addTemplateBtn?.addEventListener("click", () => {
+  if (!templateEditor) return;
+
   templateState[selectedTemplateIndex].body = templateEditor.value;
 
   const nextNum = templateState.length + 1;
@@ -293,7 +308,7 @@ addTemplateBtn.addEventListener("click", () => {
 ========= */
 
 function getFilteredIssues() {
-  const q = (searchInput.value || "").trim().toLowerCase();
+  const q = (searchInput?.value || "").trim().toLowerCase();
   if (!q) return issues;
 
   return issues.filter(it => {
@@ -302,12 +317,16 @@ function getFilteredIssues() {
       it.application,
       it.rootCause,
       ...(it.checklistItems || [])
-    ].join(" ").toLowerCase();
+    ]
+      .join(" ")
+      .toLowerCase();
     return hay.includes(q);
   });
 }
 
 function renderIssueList() {
+  if (!issueList || !issuesCountPill) return;
+
   const list = getFilteredIssues();
   issuesCountPill.textContent = String(list.length);
 
@@ -330,7 +349,7 @@ function renderIssueList() {
   });
 }
 
-searchInput.addEventListener("input", () => {
+searchInput?.addEventListener("input", () => {
   if (isInDetailScreen()) showListScreen();
   renderIssueList();
 });
@@ -345,6 +364,8 @@ function findSelectedIssue() {
 }
 
 function renderSelectedIssueDetails() {
+  if (!issueDetailsPanel) return;
+
   const it = findSelectedIssue();
   if (!it) {
     issueDetailsPanel.innerHTML = `<div class="card"><div class="details-placeholder">Issue not found.</div></div>`;
@@ -355,12 +376,14 @@ function renderSelectedIssueDetails() {
   const zendesk = safeUrl(it.zendeskLink);
 
   const templates = Array.isArray(it.templates) ? it.templates : [];
-  const templateButtons = templates.map((t, idx) => {
-    const active = idx === 0 ? "active" : "";
-    return `<button type="button" class="template-tab ${active}" data-tidx="${idx}">
+  const templateButtons = templates
+    .map((t, idx) => {
+      const active = idx === 0 ? "active" : "";
+      return `<button type="button" class="template-tab ${active}" data-tidx="${idx}">
       ${escapeHtml(t.name || `Template ${idx + 1}`)}
     </button>`;
-  }).join("");
+    })
+    .join("");
 
   issueDetailsPanel.innerHTML = `
     <div class="card details-card">
@@ -392,7 +415,13 @@ function renderSelectedIssueDetails() {
           <div class="kv-row">
             <div class="kv-key">Zendesk ticket</div>
             <div class="kv-val">
-              ${zendesk ? `<a class="link" href="${escapeHtml(zendesk)}" target="_blank" rel="noreferrer">${escapeHtml(zendesk)}</a>` : "<span class='muted'>—</span>"}
+              ${
+                zendesk
+                  ? `<a class="link" href="${escapeHtml(zendesk)}" target="_blank" rel="noreferrer">${escapeHtml(
+                      zendesk
+                    )}</a>`
+                  : "<span class='muted'>—</span>"
+              }
             </div>
           </div>
 
@@ -403,7 +432,9 @@ function renderSelectedIssueDetails() {
                 templates.length
                   ? `
                     <div class="template-tabs" id="detailsTemplateTabs">${templateButtons}</div>
-                    <textarea id="detailsTemplateBox" class="details-template-editor" readonly rows="10">${escapeHtml(templates[0]?.body || "")}</textarea>
+                    <textarea id="detailsTemplateBox" class="details-template-editor" readonly rows="10">${escapeHtml(
+                      templates[0]?.body || ""
+                    )}</textarea>
                   `
                   : "<span class='muted'>No templates saved.</span>"
               }
@@ -461,7 +492,7 @@ function renderSelectedIssueDetails() {
   // Template switching
   const detailsTabs = document.getElementById("detailsTemplateTabs");
   if (detailsTabs) {
-    detailsTabs.addEventListener("click", (e) => {
+    detailsTabs.addEventListener("click", e => {
       const btn = e.target.closest("button[data-tidx]");
       if (!btn) return;
 
@@ -481,8 +512,8 @@ function renderSelectedIssueDetails() {
   const editBody = document.getElementById("detailsBodyEdit");
 
   editBtn?.addEventListener("click", () => {
-    viewBody.classList.add("hidden");
-    editBody.classList.remove("hidden");
+    viewBody?.classList.add("hidden");
+    editBody?.classList.remove("hidden");
   });
 
   document.getElementById("cancelEditBtn")?.addEventListener("click", () => {
@@ -491,12 +522,12 @@ function renderSelectedIssueDetails() {
 
   document.getElementById("saveEditBtn")?.addEventListener("click", async () => {
     const updated = {
-      issueDescription: (document.getElementById("editIssueDescription").value || "").trim(),
-      application: (document.getElementById("editApplication").value || "").trim(),
-      rootCause: (document.getElementById("editRootCause").value || "").trim(),
-      checklistItems: linesToBullets(document.getElementById("editChecklists").value || ""),
-      zendeskLink: (document.getElementById("editZendesk").value || "").trim(),
-      solution: (document.getElementById("editSolution").value || "").trim()
+      issueDescription: (document.getElementById("editIssueDescription")?.value || "").trim(),
+      application: (document.getElementById("editApplication")?.value || "").trim(),
+      rootCause: (document.getElementById("editRootCause")?.value || "").trim(),
+      checklistItems: linesToBullets(document.getElementById("editChecklists")?.value || ""),
+      zendeskLink: (document.getElementById("editZendesk")?.value || "").trim(),
+      solution: (document.getElementById("editSolution")?.value || "").trim()
     };
     await updateIssueInFirestore(it.id, updated);
   });
@@ -522,39 +553,45 @@ async function updateIssueInFirestore(docId, updatedFields) {
 ========= */
 
 function resetForm() {
-  issueDescription.value = "";
-  applicationSelect.value = "";
-  rootCause.value = "";
-  checklists.value = "";
-  zendeskLink.value = "";
-  solution.value = "";
+  if (issueDescription) issueDescription.value = "";
+  if (applicationSelect) applicationSelect.value = "";
+  if (rootCause) rootCause.value = "";
+  if (checklists) checklists.value = "";
+  if (zendeskLink) zendeskLink.value = "";
+  if (solution) solution.value = "";
 
   templateState = structuredClone(DEFAULT_TEMPLATES);
   selectedTemplateIndex = 0;
   renderTemplateTabs();
-  templateEditor.value = templateState[0].body;
+  if (templateEditor) templateEditor.value = templateState[0].body;
 }
 
-resetIssueBtn.addEventListener("click", resetForm);
+resetIssueBtn?.addEventListener("click", resetForm);
 
-saveIssueBtn.addEventListener("click", async () => {
+saveIssueBtn?.addEventListener("click", async () => {
   if (!ensureFirestoreReady()) return;
 
-  const desc = (issueDescription.value || "").trim();
-  const app = (applicationSelect.value || "").trim();
+  const desc = (issueDescription?.value || "").trim();
+  const app = (applicationSelect?.value || "").trim();
 
-  if (!desc) { alert("Please enter an Issue Description."); return; }
-  if (!app) { alert("Please select an Application (or add a new one)."); return; }
+  if (!desc) {
+    alert("Please enter an Issue Description.");
+    return;
+  }
+  if (!app) {
+    alert("Please select an Application (or add a new one).");
+    return;
+  }
 
-  templateState[selectedTemplateIndex].body = templateEditor.value;
+  if (templateEditor) templateState[selectedTemplateIndex].body = templateEditor.value;
 
   const payload = {
     issueDescription: desc,
     application: app,
-    rootCause: (rootCause.value || "").trim(),
-    checklistItems: linesToBullets(checklists.value || ""),
-    zendeskLink: (zendeskLink.value || "").trim(),
-    solution: (solution.value || "").trim(),
+    rootCause: (rootCause?.value || "").trim(),
+    checklistItems: linesToBullets(checklists?.value || ""),
+    zendeskLink: (zendeskLink?.value || "").trim(),
+    solution: (solution?.value || "").trim(),
     templates: templateState.map(t => ({
       name: (t.name || "").trim(),
       body: (t.body || "").trim()
@@ -579,8 +616,39 @@ saveIssueBtn.addEventListener("click", async () => {
 });
 
 /* =========
-   Help Me Troubleshoot (Common Issues matching)
+   Help Me Troubleshoot
+   - First match Common Issues
+   - Then call your AI endpoint for step-by-step guidance
 ========= */
+
+const AI_ENDPOINT = "https://troubleshooting-ai.rebelpratul.workers.dev/";
+
+async function callAI({ userIssue, matchedIssue }) {
+  const res = await fetch(AI_ENDPOINT, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      issue: userIssue,
+      matched: matchedIssue
+        ? {
+            issueDescription: matchedIssue.issueDescription || "",
+            application: matchedIssue.application || "",
+            rootCause: matchedIssue.rootCause || "",
+            checklistItems: matchedIssue.checklistItems || [],
+            solution: matchedIssue.solution || ""
+          }
+        : null
+    })
+  });
+
+  if (!res.ok) {
+    const t = await res.text().catch(() => "");
+    throw new Error(`AI request failed (${res.status}). ${t}`);
+  }
+
+  const data = await res.json().catch(() => ({}));
+  return data.answer || data.output_text || data.response || "";
+}
 
 function findBestIssueMatch(queryText) {
   const q = (queryText || "").trim().toLowerCase();
@@ -675,14 +743,42 @@ async function handleHelpFindClick() {
   }
 
   const match = findBestIssueMatch(q);
+
+  // 1) Always show Common Issue match first
   renderHelpResult(match);
+
+  // 2) Then call AI and append guidance
+  helpResults.insertAdjacentHTML(
+    "beforeend",
+    `<div class="kv" style="padding: 0 16px 16px;">
+      <div class="kv-row">
+        <div class="kv-key">AI guidance</div>
+        <div class="kv-val muted" id="aiGuidanceBox">Generating troubleshooting steps…</div>
+      </div>
+    </div>`
+  );
+
+  const aiBox = document.getElementById("aiGuidanceBox");
+
+  try {
+    const aiText = await callAI({ userIssue: q, matchedIssue: match });
+    if (aiBox) {
+      aiBox.classList.remove("muted");
+      aiBox.textContent = aiText || "AI returned no text.";
+    }
+  } catch (e) {
+    if (aiBox) {
+      aiBox.innerHTML = `<span class="muted">AI call failed: ${escapeHtml(e.message || String(e))}</span>`;
+    }
+  }
 }
 
 helpFindBtn?.addEventListener("click", handleHelpFindClick);
 
 helpClearBtn?.addEventListener("click", () => {
   if (helpIssueInput) helpIssueInput.value = "";
-  if (helpResults) helpResults.innerHTML = `<div class="muted">Enter an issue above and click “Find checklist”.</div>`;
+  if (helpResults)
+    helpResults.innerHTML = `<div class="muted">Enter an issue above and click “Find checklist”.</div>`;
 });
 
 /* =========
@@ -724,7 +820,7 @@ async function init() {
   applySavedTheme();
   loadApplicationOptions();
   renderTemplateTabs();
-  templateEditor.value = templateState[0].body;
+  if (templateEditor) templateEditor.value = templateState[0].body;
 
   setActiveTab("common");
   showListScreen();

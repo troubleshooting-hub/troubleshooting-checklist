@@ -148,41 +148,43 @@
     </section>
 
     <!-- HELP ME TROUBLESHOOT -->
-    <section id="helpSection" class="section hidden">
-      <div class="section-title">
-        <h2>Help Me Troubleshoot</h2>
-        <div class="muted">Describe your issue. We'll match it with Common Issues and return a checklist.</div>
+<section id="helpSection" class="section hidden">
+  <div class="section-title">
+    <h2>Help Me Troubleshoot</h2>
+    <div class="muted">
+      Describe your issue. We’ll match it with Common Issues and then generate AI guidance.
+    </div>
+  </div>
+
+  <div class="card form-card">
+    <div class="form-grid">
+
+      <div class="form-row">
+        <label for="helpIssueInput">Describe the issue</label>
+        <input
+          id="helpIssueInput"
+          type="text"
+          placeholder='Example: "409 error: User Principal Name already exists"'
+        />
+        <small class="hint">Tip: include the system name (e.g., Active Directory / Azure AD).</small>
       </div>
 
-      <div class="card form-card">
-        <div class="form-grid">
-
-          <div class="form-row">
-            <label for="helpIssueInput">What issue are you facing?</label>
-            <input
-              id="helpIssueInput"
-              type="text"
-              placeholder='Example: "409 Active Directory"'
-              autocomplete="off"
-            />
-            <small class="hint">Include error code + system (Azure AD / AD / Okta).</small>
-          </div>
-
-          <div class="form-actions help-actions">
-            <button id="helpFindBtn" type="button" class="btn btn-primary">Find checklist</button>
-            <button id="helpClearBtn" type="button" class="btn btn-secondary">Clear</button>
-          </div>
-
-          <div class="form-row">
-            <label>Result</label>
-            <div id="helpResults" class="help-results muted">
-              Enter an issue above and click “Find checklist”.
-            </div>
-          </div>
-
-        </div>
+      <div class="row-between">
+        <button id="helpFindBtn" type="button" class="btn btn-primary">
+          Find checklist + AI guidance
+        </button>
+        <button id="helpClearBtn" type="button" class="btn btn-secondary">
+          Clear
+        </button>
       </div>
-    </section>
+
+      <div id="helpResults" class="muted">
+        Enter an issue above and click “Find checklist + AI guidance”.
+      </div>
+
+    </div>
+  </div>
+</section>
 
   </main>
 
