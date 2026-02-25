@@ -294,21 +294,6 @@ body{
   gap: 10px;
 }
 
-/* Help section: keep consistent spacing */
-.help-actions{
-  padding-top: 0;
-}
-.help-results{
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 12px 14px;
-  background: rgba(255,255,255,0.98);
-  color: var(--ink);
-}
-.light-theme .help-results{
-  background: rgba(255,255,255,0.98);
-}
-
 .btn{
   border: 1px solid var(--border);
   border-radius: 14px;

@@ -10,13 +10,13 @@
   <title>Troubleshooting Checklist Portal</title>
 
   <!-- Use absolute path under the repo -->
-  <link rel="stylesheet" href="style.css?v=20" />
+  <link rel="stylesheet" href="style.css?v=21" />
 </head>
 
 <body>
 <header class="site-header">
   <div class="header-inner header-flex">
-    <img 
+    <img
       class="brand-logo"
       src="assets/aquera-logo.png"
       alt="Aquera"
@@ -147,44 +147,70 @@
       </div>
     </section>
 
-    <!-- HELP ME TROUBLESHOOT -->
-<section id="helpSection" class="section hidden">
-  <div class="section-title">
-    <h2>Help Me Troubleshoot</h2>
-    <div class="muted">
-      Describe your issue. We’ll match it with Common Issues and then generate AI guidance.
-    </div>
-  </div>
-
-  <div class="card form-card">
-    <div class="form-grid">
-
-      <div class="form-row">
-        <label for="helpIssueInput">Describe the issue</label>
-        <input
-          id="helpIssueInput"
-          type="text"
-          placeholder='Example: "409 error: User Principal Name already exists"'
-        />
-        <small class="hint">Tip: include the system name (e.g., Active Directory / Azure AD).</small>
+    <!-- HELP ME TROUBLESHOOT (NEW FLOW — NO AI CALLS) -->
+    <section id="helpSection" class="section hidden">
+      <div class="section-title">
+        <h2>Help Me Troubleshoot</h2>
+        <div class="muted">
+          Paste what you already checked. We’ll compare it to the standard checklist and guide you to the next step.
+        </div>
       </div>
 
-      <div class="row-between">
-        <button id="helpFindBtn" type="button" class="btn btn-primary">
-          Find checklist + AI guidance
-        </button>
-        <button id="helpClearBtn" type="button" class="btn btn-secondary">
-          Clear
-        </button>
-      </div>
+      <div class="card form-card">
+        <div class="form-grid">
 
-      <div id="helpResults" class="muted">
-        Enter an issue above and click “Find checklist + AI guidance”.
-      </div>
+          <div class="form-row">
+            <label for="helpIssueInput">Issue description</label>
+            <input
+              id="helpIssueInput"
+              type="text"
+              placeholder='Example: "409 error: User Principal Name already exists (Active Directory)"'
+            />
+            <small class="hint">Tip: include the system name (e.g., Active Directory / Azure AD).</small>
+          </div>
 
-    </div>
-  </div>
-</section>
+          <div class="form-row">
+            <label for="helpCheckedInput">I have checked the following:</label>
+            <textarea
+              id="helpCheckedInput"
+              rows="9"
+              placeholder="Paste your completed checks here (one per line)."
+            ></textarea>
+            <small class="hint">One line = one completed check. Do not include steps you did not perform.</small>
+          </div>
+
+          <div class="row-between">
+            <button id="helpAnalyzeBtn" type="button" class="btn btn-primary">
+              Analyze my checklist
+            </button>
+            <button id="helpClearBtn" type="button" class="btn btn-secondary">
+              Clear
+            </button>
+          </div>
+
+          <div id="helpResults" class="muted">
+            Enter an issue + your completed checks, then click “Analyze my checklist”.
+          </div>
+
+          <!-- Step 2 / 3 controls (hidden until needed) -->
+          <div id="helpNextActions" class="hidden">
+            <div class="row-between" style="margin-top: 8px;">
+              <button id="helpDocsReviewedBtn" type="button" class="btn btn-secondary">
+                I have checked the documentation — still no luck.
+              </button>
+
+              <button id="helpGeneratePromptBtn" type="button" class="btn btn-primary">
+                Generate ChatGPT-ready prompt
+              </button>
+            </div>
+            <small class="hint">
+              Use the documentation button only after you have checked every item. Use the prompt button after documentation also didn’t help.
+            </small>
+          </div>
+
+        </div>
+      </div>
+    </section>
 
   </main>
 
@@ -245,7 +271,7 @@
 
     // Load script.js only after Firebase globals exist
     const s = document.createElement("script");
-    s.src = "/troubleshooting-checklist/script.js?v=20";
+    s.src = "/troubleshooting-checklist/script.js?v=21";
     s.defer = true;
     document.body.appendChild(s);
   </script>

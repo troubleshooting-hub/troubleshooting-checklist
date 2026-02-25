@@ -20,20 +20,40 @@ function linesToBullets(text = "") {
 
 function bulletsToHtml(items = []) {
   if (!items.length) return "<div class='muted'>No checklist items.</div>";
-  return `<ul class="bullet-list">${items
-    .map(li => `<li>${escapeHtml(li)}</li>`)
-    .join("")}</ul>`;
+  return `<ul class="bullet-list">${items.map(li => `<li>${escapeHtml(li)}</li>`).join("")}</ul>`;
 }
 
 function safeUrl(url) {
   const u = (url || "").trim();
   if (!u) return "";
-  try {
-    new URL(u);
-    return u;
-  } catch {
-    return "";
-  }
+  try { new URL(u); return u; } catch { return ""; }
+}
+
+function normalizeText(s = "") {
+  return String(s)
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function containsLoose(haystack, needle) {
+  const h = normalizeText(haystack);
+  const n = normalizeText(needle);
+  if (!h || !n) return false;
+  if (h.includes(n)) return true;
+
+  // loose token overlap (helps when user paraphrases)
+  const hTokens = new Set(h.split(" ").filter(Boolean));
+  const nTokens = n.split(" ").filter(Boolean);
+  if (!nTokens.length) return false;
+
+  let hits = 0;
+  for (const t of nTokens) if (hTokens.has(t)) hits++;
+
+  // if checklist item is long, require decent overlap
+  const ratio = hits / nTokens.length;
+  return ratio >= 0.55;
 }
 
 /* =========
@@ -41,19 +61,14 @@ function safeUrl(url) {
 ========= */
 
 const DEFAULT_APPS = [
-  "Active Directory",
-  "Azure AD",
-  "Okta",
-  "ADP",
-  "Paycor",
-  "Dayforce",
-  "Paylocity"
+  "Active Directory", "Azure AD", "Okta", "ADP", "Paycor", "Dayforce", "Paylocity"
 ];
 
 const DEFAULT_TEMPLATES = [
   {
     name: "Template 1",
-    body: `Subject: Update on your issue
+    body:
+`Subject: Update on your issue
 
 Hi there,
 
@@ -64,7 +79,8 @@ Regards,`
   },
   {
     name: "Template 2",
-    body: `Subject: Request for additional details
+    body:
+`Subject: Request for additional details
 
 Hi there,
 
@@ -79,7 +95,8 @@ Regards,`
   },
   {
     name: "Template 3",
-    body: `Subject: Issue resolved
+    body:
+`Subject: Issue resolved
 
 Hi there,
 
@@ -159,12 +176,10 @@ async function loadIssuesFromFirestore() {
   const colRef = collection(window.db, "issues");
 
   try {
-    // Preferred: sorted newest first
     const q = query(colRef, orderBy("createdAt", "desc"));
     const snap = await getDocs(q);
     issues = snap.docs.map(d => ({ id: d.id, ...d.data() }));
   } catch (e) {
-    // Fallback: if some docs don't have createdAt or ordering fails
     console.warn("OrderBy(createdAt) failed, falling back to unsorted getDocs()", e);
     const snap = await getDocs(colRef);
     issues = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -172,7 +187,6 @@ async function loadIssuesFromFirestore() {
 
   renderIssueList();
 
-  // If still in detail screen, refresh panel
   if (isInDetailScreen() && selectedIssueId) {
     renderSelectedIssueDetails();
   }
@@ -195,13 +209,9 @@ function setActiveTab(tab) {
   newSection?.classList.toggle("hidden", !isNew);
   helpSection?.classList.toggle("hidden", !isHelp);
 
-  // Search bar only for Common
   if (searchInput) searchInput.style.display = isCommon ? "" : "none";
 
-  // Leaving Common should reset its detail view
-  if (!isCommon) {
-    showListScreen();
-  }
+  if (!isCommon) showListScreen();
 }
 
 tabCommon?.addEventListener("click", () => setActiveTab("common"));
@@ -238,7 +248,6 @@ backToListBtn?.addEventListener("click", showListScreen);
 
 function loadApplicationOptions() {
   if (!applicationSelect) return;
-
   applicationSelect.innerHTML = `<option value="">Select application</option>`;
   DEFAULT_APPS.forEach(app => {
     const opt = document.createElement("option");
@@ -317,9 +326,7 @@ function getFilteredIssues() {
       it.application,
       it.rootCause,
       ...(it.checklistItems || [])
-    ]
-      .join(" ")
-      .toLowerCase();
+    ].join(" ").toLowerCase();
     return hay.includes(q);
   });
 }
@@ -336,7 +343,6 @@ function renderIssueList() {
   }
 
   issueList.innerHTML = "";
-
   list.forEach(it => {
     const li = document.createElement("li");
     li.className = "issue-item";
@@ -376,14 +382,12 @@ function renderSelectedIssueDetails() {
   const zendesk = safeUrl(it.zendeskLink);
 
   const templates = Array.isArray(it.templates) ? it.templates : [];
-  const templateButtons = templates
-    .map((t, idx) => {
-      const active = idx === 0 ? "active" : "";
-      return `<button type="button" class="template-tab ${active}" data-tidx="${idx}">
+  const templateButtons = templates.map((t, idx) => {
+    const active = idx === 0 ? "active" : "";
+    return `<button type="button" class="template-tab ${active}" data-tidx="${idx}">
       ${escapeHtml(t.name || `Template ${idx + 1}`)}
     </button>`;
-    })
-    .join("");
+  }).join("");
 
   issueDetailsPanel.innerHTML = `
     <div class="card details-card">
@@ -415,13 +419,7 @@ function renderSelectedIssueDetails() {
           <div class="kv-row">
             <div class="kv-key">Zendesk ticket</div>
             <div class="kv-val">
-              ${
-                zendesk
-                  ? `<a class="link" href="${escapeHtml(zendesk)}" target="_blank" rel="noreferrer">${escapeHtml(
-                      zendesk
-                    )}</a>`
-                  : "<span class='muted'>—</span>"
-              }
+              ${zendesk ? `<a class="link" href="${escapeHtml(zendesk)}" target="_blank" rel="noreferrer">${escapeHtml(zendesk)}</a>` : "<span class='muted'>—</span>"}
             </div>
           </div>
 
@@ -432,9 +430,7 @@ function renderSelectedIssueDetails() {
                 templates.length
                   ? `
                     <div class="template-tabs" id="detailsTemplateTabs">${templateButtons}</div>
-                    <textarea id="detailsTemplateBox" class="details-template-editor" readonly rows="10">${escapeHtml(
-                      templates[0]?.body || ""
-                    )}</textarea>
+                    <textarea id="detailsTemplateBox" class="details-template-editor" readonly rows="10">${escapeHtml(templates[0]?.body || "")}</textarea>
                   `
                   : "<span class='muted'>No templates saved.</span>"
               }
@@ -489,10 +485,9 @@ function renderSelectedIssueDetails() {
     </div>
   `;
 
-  // Template switching
   const detailsTabs = document.getElementById("detailsTemplateTabs");
   if (detailsTabs) {
-    detailsTabs.addEventListener("click", e => {
+    detailsTabs.addEventListener("click", (e) => {
       const btn = e.target.closest("button[data-tidx]");
       if (!btn) return;
 
@@ -506,14 +501,13 @@ function renderSelectedIssueDetails() {
     });
   }
 
-  // Edit toggles
   const editBtn = document.getElementById("editIssueBtn");
   const viewBody = document.getElementById("detailsBodyView");
   const editBody = document.getElementById("detailsBodyEdit");
 
   editBtn?.addEventListener("click", () => {
-    viewBody?.classList.add("hidden");
-    editBody?.classList.remove("hidden");
+    viewBody.classList.add("hidden");
+    editBody.classList.remove("hidden");
   });
 
   document.getElementById("cancelEditBtn")?.addEventListener("click", () => {
@@ -522,12 +516,12 @@ function renderSelectedIssueDetails() {
 
   document.getElementById("saveEditBtn")?.addEventListener("click", async () => {
     const updated = {
-      issueDescription: (document.getElementById("editIssueDescription")?.value || "").trim(),
-      application: (document.getElementById("editApplication")?.value || "").trim(),
-      rootCause: (document.getElementById("editRootCause")?.value || "").trim(),
-      checklistItems: linesToBullets(document.getElementById("editChecklists")?.value || ""),
-      zendeskLink: (document.getElementById("editZendesk")?.value || "").trim(),
-      solution: (document.getElementById("editSolution")?.value || "").trim()
+      issueDescription: (document.getElementById("editIssueDescription").value || "").trim(),
+      application: (document.getElementById("editApplication").value || "").trim(),
+      rootCause: (document.getElementById("editRootCause").value || "").trim(),
+      checklistItems: linesToBullets(document.getElementById("editChecklists").value || ""),
+      zendeskLink: (document.getElementById("editZendesk").value || "").trim(),
+      solution: (document.getElementById("editSolution").value || "").trim()
     };
     await updateIssueInFirestore(it.id, updated);
   });
@@ -553,45 +547,39 @@ async function updateIssueInFirestore(docId, updatedFields) {
 ========= */
 
 function resetForm() {
-  if (issueDescription) issueDescription.value = "";
-  if (applicationSelect) applicationSelect.value = "";
-  if (rootCause) rootCause.value = "";
-  if (checklists) checklists.value = "";
-  if (zendeskLink) zendeskLink.value = "";
-  if (solution) solution.value = "";
+  issueDescription.value = "";
+  applicationSelect.value = "";
+  rootCause.value = "";
+  checklists.value = "";
+  zendeskLink.value = "";
+  solution.value = "";
 
   templateState = structuredClone(DEFAULT_TEMPLATES);
   selectedTemplateIndex = 0;
   renderTemplateTabs();
-  if (templateEditor) templateEditor.value = templateState[0].body;
+  templateEditor.value = templateState[0].body;
 }
 
-resetIssueBtn?.addEventListener("click", resetForm);
+resetIssueBtn.addEventListener("click", resetForm);
 
-saveIssueBtn?.addEventListener("click", async () => {
+saveIssueBtn.addEventListener("click", async () => {
   if (!ensureFirestoreReady()) return;
 
-  const desc = (issueDescription?.value || "").trim();
-  const app = (applicationSelect?.value || "").trim();
+  const desc = (issueDescription.value || "").trim();
+  const app = (applicationSelect.value || "").trim();
 
-  if (!desc) {
-    alert("Please enter an Issue Description.");
-    return;
-  }
-  if (!app) {
-    alert("Please select an Application (or add a new one).");
-    return;
-  }
+  if (!desc) { alert("Please enter an Issue Description."); return; }
+  if (!app) { alert("Please select an Application (or add a new one)."); return; }
 
-  if (templateEditor) templateState[selectedTemplateIndex].body = templateEditor.value;
+  templateState[selectedTemplateIndex].body = templateEditor.value;
 
   const payload = {
     issueDescription: desc,
     application: app,
-    rootCause: (rootCause?.value || "").trim(),
-    checklistItems: linesToBullets(checklists?.value || ""),
-    zendeskLink: (zendeskLink?.value || "").trim(),
-    solution: (solution?.value || "").trim(),
+    rootCause: (rootCause.value || "").trim(),
+    checklistItems: linesToBullets(checklists.value || ""),
+    zendeskLink: (zendeskLink.value || "").trim(),
+    solution: (solution.value || "").trim(),
     templates: templateState.map(t => ({
       name: (t.name || "").trim(),
       body: (t.body || "").trim()
@@ -616,39 +604,28 @@ saveIssueBtn?.addEventListener("click", async () => {
 });
 
 /* =========
-   Help Me Troubleshoot
-   - First match Common Issues
-   - Then call your AI endpoint for step-by-step guidance
+   Help Me Troubleshoot (NEW FLOW - no API calls)
 ========= */
 
-const AI_ENDPOINT = "https://troubleshooting-ai.rebelpratul.workers.dev/";
+// Put your AD troubleshooting doc link here (or leave blank for now).
+const AD_TROUBLESHOOT_DOC_URL = ""; // e.g. "https://your-internal-doc-link"
 
-async function callAI({ userIssue, matchedIssue }) {
-  const res = await fetch(AI_ENDPOINT, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      issue: userIssue,
-      matched: matchedIssue
-        ? {
-            issueDescription: matchedIssue.issueDescription || "",
-            application: matchedIssue.application || "",
-            rootCause: matchedIssue.rootCause || "",
-            checklistItems: matchedIssue.checklistItems || [],
-            solution: matchedIssue.solution || ""
-          }
-        : null
-    })
-  });
+const HELP_PREDEFINED = {
+  missedPrefix: "Hey, you missed checking:",
+  allChecked: "Okay, you have checked everything.",
+  referDocs: "Kindly refer to the Active Directory troubleshooting documentation.\nHere is the link:",
+  askDocConfirm: "Confirm after reviewing the documentation:",
+  docStillNoLuck: "I have checked the documentation — still no luck.",
+  makePrompt: "Hey, no worries. I will create a ChatGPT-ready prompt that you can paste directly into ChatGPT."
+};
 
-  if (!res.ok) {
-    const t = await res.text().catch(() => "");
-    throw new Error(`AI request failed (${res.status}). ${t}`);
-  }
-
-  const data = await res.json().catch(() => ({}));
-  return data.answer || data.output_text || data.response || "";
-}
+const helpState = {
+  userIssue: "",
+  matchedIssue: null,
+  userChecklistText: "",
+  missingItems: [],
+  docReviewed: false
+};
 
 function findBestIssueMatch(queryText) {
   const q = (queryText || "").trim().toLowerCase();
@@ -669,7 +646,6 @@ function findBestIssueMatch(queryText) {
     if (root.includes(q)) score += 2;
     if (checklist.includes(q)) score += 1;
 
-    // If user types only "409", still likely matches
     if (q.length <= 6 && (desc.includes(q) || checklist.includes(q))) score += 1;
 
     if (score > bestScore) {
@@ -681,104 +657,329 @@ function findBestIssueMatch(queryText) {
   return bestScore > 0 ? best : null;
 }
 
-function renderHelpResult(issue) {
+function computeMissingChecklistItems(userChecklistLines, commonChecklistItems) {
+  const userCombined = userChecklistLines.join("\n");
+
+  const missing = [];
+  for (const item of commonChecklistItems) {
+    const ok = containsLoose(userCombined, item);
+    if (!ok) missing.push(item);
+  }
+  return missing;
+}
+
+function buildChatGPTPrompt() {
+  const match = helpState.matchedIssue;
+
+  const issueTitle = helpState.userIssue || "(not provided)";
+  const matchedTitle = match?.issueDescription || "(no matched Common Issue)";
+  const matchedApp = match?.application || "";
+  const suspectedRoot = match?.rootCause || "(not provided)";
+  const commonChecklist = (match?.checklistItems || []).map(x => `- ${x}`).join("\n") || "- (none)";
+  const completedChecklist = linesToBullets(helpState.userChecklistText || "").map(x => `- ${x}`).join("\n") || "- (none)";
+
+  const docLine = AD_TROUBLESHOOT_DOC_URL
+    ? `- Documentation reviewed: Yes (${AD_TROUBLESHOOT_DOC_URL})`
+    : `- Documentation reviewed: Yes (link not set in app yet)`;
+
+  const prompt = `You are helping troubleshoot an identity/integration issue. Use the details below and propose next diagnostic steps and likely root causes. Be explicit and actionable.
+
+Issue description (what I entered):
+${issueTitle}
+
+Matched Common Issue (from our internal checklist library):
+- Title: ${matchedTitle}${matchedApp ? `\n- Application: ${matchedApp}` : ""}
+
+Suspected root cause (from Common Issue entry):
+${suspectedRoot}
+
+Standard troubleshooting checklist for this issue (Common Issue checklist):
+${commonChecklist}
+
+Troubleshooting steps I have already completed (confirmed):
+${completedChecklist}
+
+Additional steps taken:
+${docLine}
+- Current status: Still failing / no resolution yet.
+
+Please propose:
+1) The most likely remaining causes (ranked)
+2) The next 5–10 checks to run (exactly how to check each)
+3) What logs or evidence I should collect and what to look for in them
+4) Any safe remediation steps
+
+Important: I will attach supporting files. Please tell me what to look for in each.`;
+
+  return prompt;
+}
+
+function renderHelpUIInitial() {
+  if (!helpResults) return;
+  helpResults.innerHTML = `<div class="muted">Enter an issue above and click “Find checklist”.</div>`;
+}
+
+function renderHelpUIMatched(match) {
   if (!helpResults) return;
 
-  if (!issue) {
-    helpResults.innerHTML = `
-      <div class="muted">No matching Common Issue found. Try adding the system name (e.g., "409 Active Directory").</div>
-    `;
-    return;
-  }
-
-  const checklistHtml = bulletsToHtml(issue.checklistItems || []);
+  const hasMatch = !!match;
+  const checklistHtml = hasMatch ? bulletsToHtml(match.checklistItems || []) : "";
+  const appPill = hasMatch && match.application ? `<span class="pill">${escapeHtml(match.application)}</span>` : "";
 
   helpResults.innerHTML = `
     <div class="card details-card" style="margin-top:10px;">
       <div class="card-head">
         <div class="card-title">Matched Common Issue</div>
         <div class="card-actions">
-          ${issue.application ? `<span class="pill">${escapeHtml(issue.application)}</span>` : ""}
+          ${appPill}
         </div>
       </div>
 
       <div class="kv">
-        <div class="kv-row">
-          <div class="kv-key">Issue</div>
-          <div class="kv-val">${escapeHtml(issue.issueDescription || "Untitled issue")}</div>
-        </div>
+        ${
+          hasMatch
+            ? `
+              <div class="kv-row">
+                <div class="kv-key">Issue</div>
+                <div class="kv-val">${escapeHtml(match.issueDescription || "Untitled issue")}</div>
+              </div>
+
+              <div class="kv-row">
+                <div class="kv-key">Checklist (standard)</div>
+                <div class="kv-val">${checklistHtml}</div>
+              </div>
+
+              <div class="kv-row">
+                <div class="kv-key">Root cause</div>
+                <div class="kv-val">${escapeHtml(match.rootCause || "") || "<span class='muted'>—</span>"}</div>
+              </div>
+
+              <div class="kv-row">
+                <div class="kv-key">Solution</div>
+                <div class="kv-val prewrap">${escapeHtml(match.solution || "") || "<span class='muted'>—</span>"}</div>
+              </div>
+            `
+            : `
+              <div class="kv-row">
+                <div class="kv-key">No matching Common Issue found</div>
+                <div class="kv-val muted">
+                  Try adding a system name (e.g., "409 Active Directory"), or create this issue in the "New Issues" tab so it becomes searchable.
+                </div>
+              </div>
+            `
+        }
 
         <div class="kv-row">
-          <div class="kv-key">Checklist</div>
-          <div class="kv-val">${checklistHtml}</div>
+          <div class="kv-key">Step 1 — Paste what you already checked</div>
+          <div class="kv-val">
+            <div class="muted" style="margin-bottom:10px;">
+              Start your message with: <b>“I have checked the following:”</b><br/>
+              Then paste your checklist lines below.
+            </div>
+
+            <textarea id="helpCheckedBox" class="details-template-editor" rows="10" placeholder="I have checked the following:\n- ..."></textarea>
+
+            <div class="row-between" style="margin-top:10px;">
+              <button type="button" class="btn btn-primary" id="helpAnalyzeBtn">Compare with standard checklist</button>
+              <span class="pill muted-pill">No assumptions: only what you typed counts</span>
+            </div>
+          </div>
         </div>
 
-        <div class="kv-row">
-          <div class="kv-key">Root cause</div>
-          <div class="kv-val">${escapeHtml(issue.rootCause || "") || "<span class='muted'>—</span>"}</div>
-        </div>
-
-        <div class="kv-row">
-          <div class="kv-key">Solution</div>
-          <div class="kv-val prewrap">${escapeHtml(issue.solution || "") || "<span class='muted'>—</span>"}</div>
+        <div class="kv-row" id="helpStep2Area">
+          <div class="kv-key">Next steps</div>
+          <div class="kv-val muted">
+            Click “Compare with standard checklist” to see what’s missing.
+          </div>
         </div>
       </div>
     </div>
   `;
+
+  // Wire Step 1 button
+  document.getElementById("helpAnalyzeBtn")?.addEventListener("click", () => {
+    const box = document.getElementById("helpCheckedBox");
+    const text = (box?.value || "").trim();
+    helpState.userChecklistText = text;
+
+    if (!text || !normalizeText(text).includes(normalizeText("I have checked the following"))) {
+      renderHelpStep2Message(`<span class="muted">Please start with “I have checked the following:” and list what you checked.</span>`);
+      return;
+    }
+
+    const userLines = linesToBullets(text.replace(/^\s*i have checked the following:\s*/i, ""));
+    const commonLines = (helpState.matchedIssue?.checklistItems || []);
+
+    if (!commonLines.length) {
+      // no standard checklist to compare against
+      renderHelpStep2AllCheckedNoStandard();
+      return;
+    }
+
+    const missing = computeMissingChecklistItems(userLines, commonLines);
+    helpState.missingItems = missing;
+
+    if (missing.length) {
+      renderHelpStep2Missing(missing);
+    } else {
+      renderHelpStep2AllChecked();
+    }
+  });
+}
+
+function renderHelpStep2Message(html) {
+  const area = document.getElementById("helpStep2Area");
+  if (!area) return;
+  area.querySelector(".kv-val")?.remove();
+  area.insertAdjacentHTML("beforeend", `<div class="kv-val">${html}</div>`);
+}
+
+function renderHelpStep2Missing(missingItems) {
+  const missingHtml = `<div style="margin-bottom:10px;"><b>${escapeHtml(HELP_PREDEFINED.missedPrefix)}</b></div>
+    <ul class="bullet-list">${missingItems.map(x => `<li>${escapeHtml(x)}</li>`).join("")}</ul>
+    <div class="muted" style="margin-top:10px;">
+      Add the missing checks to your “I have checked the following:” list, then click “Compare with standard checklist” again.
+    </div>`;
+
+  renderHelpStep2Message(missingHtml);
+}
+
+function renderHelpStep2AllCheckedNoStandard() {
+  const html = `
+    <div style="margin-bottom:10px;"><b>${escapeHtml(HELP_PREDEFINED.allChecked)}</b></div>
+    <div class="muted">No standard checklist exists for this (no matched Common Issue), so I can't compare automatically.</div>
+    <div style="margin-top:12px;">
+      <button type="button" class="btn btn-secondary" id="helpDocNoLuckBtn">${escapeHtml(HELP_PREDEFINED.docStillNoLuck)}</button>
+    </div>
+  `;
+  renderHelpStep2Message(html);
+
+  document.getElementById("helpDocNoLuckBtn")?.addEventListener("click", () => {
+    renderHelpStep3Prompt();
+  });
+}
+
+function renderHelpStep2AllChecked() {
+  const docLinkHtml = AD_TROUBLESHOOT_DOC_URL
+    ? `<a class="link" href="${escapeHtml(AD_TROUBLESHOOT_DOC_URL)}" target="_blank" rel="noreferrer">${escapeHtml(AD_TROUBLESHOOT_DOC_URL)}</a>`
+    : `<span class="muted">[Add your AD troubleshooting doc link in script.js → AD_TROUBLESHOOT_DOC_URL]</span>`;
+
+  const html = `
+    <div style="margin-bottom:10px;"><b>${escapeHtml(HELP_PREDEFINED.allChecked)}</b></div>
+    <div class="muted" style="margin-bottom:10px;">${escapeHtml(HELP_PREDEFINED.referDocs)}</div>
+    <div style="margin-bottom:12px;">${docLinkHtml}</div>
+
+    <div class="muted" style="margin-bottom:10px;">${escapeHtml(HELP_PREDEFINED.askDocConfirm)}</div>
+
+    <div class="row-between">
+      <button type="button" class="btn btn-primary" id="helpDocReviewedBtn">I reviewed the documentation</button>
+      <button type="button" class="btn btn-secondary" id="helpDocNoLuckBtn">${escapeHtml(HELP_PREDEFINED.docStillNoLuck)}</button>
+    </div>
+  `;
+  renderHelpStep2Message(html);
+
+  document.getElementById("helpDocReviewedBtn")?.addEventListener("click", () => {
+    helpState.docReviewed = true;
+    renderHelpStep2Message(`<div class="muted">Noted. If it still doesn’t help, click: <b>${escapeHtml(HELP_PREDEFINED.docStillNoLuck)}</b></div>
+      <div style="margin-top:12px;">
+        <button type="button" class="btn btn-secondary" id="helpDocNoLuckBtn">${escapeHtml(HELP_PREDEFINED.docStillNoLuck)}</button>
+      </div>`);
+    document.getElementById("helpDocNoLuckBtn")?.addEventListener("click", () => renderHelpStep3Prompt());
+  });
+
+  document.getElementById("helpDocNoLuckBtn")?.addEventListener("click", () => {
+    renderHelpStep3Prompt();
+  });
+}
+
+function renderHelpStep3Prompt() {
+  const prompt = buildChatGPTPrompt();
+
+  const attachments = [
+    "Relevant integration log.txt files",
+    "Relevant application log.txt files",
+    "The integration / customer script JSON file",
+    "Ticket details (error code, timestamps, affected user, environment)"
+  ];
+
+  const html = `
+    <div style="margin-bottom:10px;"><b>${escapeHtml(HELP_PREDEFINED.makePrompt)}</b></div>
+
+    <div class="kv-row" style="border-top:none; padding-top:0;">
+      <div class="kv-key">ChatGPT-ready prompt</div>
+      <div class="kv-val">
+        <textarea id="helpPromptBox" class="details-template-editor" rows="14">${escapeHtml(prompt)}</textarea>
+        <div class="row-between" style="margin-top:10px;">
+          <button type="button" class="btn btn-primary" id="helpCopyPromptBtn">Copy prompt</button>
+          <span class="pill muted-pill">Paste into ChatGPT</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="kv-row">
+      <div class="kv-key">Attach these for better answers</div>
+      <div class="kv-val">
+        <ul class="bullet-list">${attachments.map(a => `<li>${escapeHtml(a)}</li>`).join("")}</ul>
+        <div class="muted" style="margin-top:8px;">
+          Attaching these helps ChatGPT analyze the issue more effectively and provide accurate guidance.
+        </div>
+      </div>
+    </div>
+  `;
+
+  renderHelpStep2Message(html);
+
+  document.getElementById("helpCopyPromptBtn")?.addEventListener("click", async () => {
+    const box = document.getElementById("helpPromptBox");
+    const text = box?.value || "";
+    try {
+      await navigator.clipboard.writeText(text);
+      document.getElementById("helpCopyPromptBtn").textContent = "Copied";
+      setTimeout(() => {
+        const b = document.getElementById("helpCopyPromptBtn");
+        if (b) b.textContent = "Copy prompt";
+      }, 1200);
+    } catch {
+      alert("Could not copy automatically. Please select the text and copy manually.");
+    }
+  });
 }
 
 async function handleHelpFindClick() {
   if (!helpIssueInput || !helpResults) return;
 
-  const q = helpIssueInput.value || "";
-  if (!q.trim()) {
+  const q = (helpIssueInput.value || "").trim();
+  if (!q) {
     helpResults.innerHTML = `<div class="muted">Please enter an issue (e.g., "409 Active Directory").</div>`;
     return;
   }
 
-  // Ensure issues are loaded (prevents "nothing happens")
+  helpState.userIssue = q;
+  helpState.userChecklistText = "";
+  helpState.missingItems = [];
+  helpState.docReviewed = false;
+
   if (!issues.length) {
     helpResults.innerHTML = `<div class="muted">Loading Common Issues…</div>`;
     await loadIssuesFromFirestore();
   }
 
   const match = findBestIssueMatch(q);
+  helpState.matchedIssue = match || null;
 
-  // 1) Always show Common Issue match first
-  renderHelpResult(match);
-
-  // 2) Then call AI and append guidance
-  helpResults.insertAdjacentHTML(
-    "beforeend",
-    `<div class="kv" style="padding: 0 16px 16px;">
-      <div class="kv-row">
-        <div class="kv-key">AI guidance</div>
-        <div class="kv-val muted" id="aiGuidanceBox">Generating troubleshooting steps…</div>
-      </div>
-    </div>`
-  );
-
-  const aiBox = document.getElementById("aiGuidanceBox");
-
-  try {
-    const aiText = await callAI({ userIssue: q, matchedIssue: match });
-    if (aiBox) {
-      aiBox.classList.remove("muted");
-      aiBox.textContent = aiText || "AI returned no text.";
-    }
-  } catch (e) {
-    if (aiBox) {
-      aiBox.innerHTML = `<span class="muted">AI call failed: ${escapeHtml(e.message || String(e))}</span>`;
-    }
-  }
+  renderHelpUIMatched(match);
 }
 
 helpFindBtn?.addEventListener("click", handleHelpFindClick);
 
 helpClearBtn?.addEventListener("click", () => {
   if (helpIssueInput) helpIssueInput.value = "";
-  if (helpResults)
-    helpResults.innerHTML = `<div class="muted">Enter an issue above and click “Find checklist”.</div>`;
+  helpState.userIssue = "";
+  helpState.matchedIssue = null;
+  helpState.userChecklistText = "";
+  helpState.missingItems = [];
+  helpState.docReviewed = false;
+  renderHelpUIInitial();
 });
 
 /* =========
@@ -795,7 +996,6 @@ function applySavedTheme() {
     document.documentElement.classList.add("light-theme");
     if (themeToggle) themeToggle.textContent = "🌙";
   } else {
-    // default = dark
     document.documentElement.classList.remove("light-theme");
     if (themeToggle) themeToggle.textContent = "☀️";
   }
@@ -815,16 +1015,16 @@ if (themeToggle) {
   });
 }
 
-// App init (ONLY ONCE)
 async function init() {
   applySavedTheme();
   loadApplicationOptions();
   renderTemplateTabs();
-  if (templateEditor) templateEditor.value = templateState[0].body;
+  templateEditor.value = templateState[0].body;
 
   setActiveTab("common");
   showListScreen();
 
+  renderHelpUIInitial();
   await loadIssuesFromFirestore();
 }
 
