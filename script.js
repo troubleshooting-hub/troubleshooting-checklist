@@ -4,6 +4,10 @@
    Step 1: Match issue -> compare user checklist vs saved checklist -> show missing
    Step 2: If complete OR no match -> show doc link + wait for user confirmation
    Step 3: If user says doc checked/no luck -> generate ChatGPT-ready prompt
+
+   Additions in this version:
+   - Duplicate detection (New Issues): shows a suggestion box + confirms on Save if near-duplicate/exact duplicate
+   - Delete from Common Issues list: 3-dot menu per issue -> Delete (Firestore)
 ========================================================= */
 
 /* =========
@@ -59,7 +63,6 @@ function normalizeForCompare(s = "") {
 function isStepLikeLine(line = "") {
   const t = normalizeForCompare(line);
   if (!t) return false;
-  // Skip headings/labels people paste
   const skip = [
     "additionally",
     "checklist",
@@ -85,6 +88,26 @@ function uniqueNormalized(items = []) {
     out.push({ raw, norm: n });
   }
   return out;
+}
+
+function tokenize(s = "") {
+  return normalizeForCompare(s)
+    .split(" ")
+    .map(w => w.trim())
+    .filter(Boolean)
+    .filter(w => w.length >= 3);
+}
+
+function jaccardScore(aTokens = [], bTokens = []) {
+  const A = new Set(aTokens);
+  const B = new Set(bTokens);
+  if (!A.size && !B.size) return 0;
+
+  let inter = 0;
+  for (const x of A) if (B.has(x)) inter++;
+
+  const union = new Set([...A, ...B]).size;
+  return union ? inter / union : 0;
 }
 
 /* =========
@@ -147,6 +170,9 @@ let selectedIssueId = null;
 let selectedTemplateIndex = 0;
 let templateState = structuredClone(DEFAULT_TEMPLATES);
 
+// Used for list 3-dot menus
+let openMenuIssueId = null;
+
 /* =========
    DOM
 ========= */
@@ -186,11 +212,119 @@ const saveIssueBtn = document.getElementById("saveIssueBtn");
 const resetIssueBtn = document.getElementById("resetIssueBtn");
 
 // Help (new flow elements expected in updated index.html)
-const helpIssueInput = document.getElementById("helpIssueInput");                 // Issue description
-const helpCheckedInput = document.getElementById("helpCheckedInput");             // textarea: "I have checked the following:"
-const helpAnalyzeBtn = document.getElementById("helpAnalyzeBtn");                 // Analyze my checklist
-const helpClearBtn = document.getElementById("helpClearBtn");                     // Clear
-const helpResults = document.getElementById("helpResults");                       // output container
+const helpIssueInput = document.getElementById("helpIssueInput");
+const helpCheckedInput = document.getElementById("helpCheckedInput");
+const helpAnalyzeBtn = document.getElementById("helpAnalyzeBtn");
+const helpClearBtn = document.getElementById("helpClearBtn");
+const helpResults = document.getElementById("helpResults");
+
+/* =========
+   Duplicate suggestion UI (created dynamically)
+========= */
+
+let dupSuggestionEl = null;
+
+function ensureDupSuggestionBox() {
+  if (dupSuggestionEl) return dupSuggestionEl;
+  if (!issueDescription) return null;
+
+  // Insert right after Issue Description input
+  const wrap = issueDescription.parentElement; // .form-row
+  if (!wrap) return null;
+
+  const box = document.createElement("div");
+  box.id = "dupSuggestionBox";
+  box.className = "dup-box hidden";
+  wrap.appendChild(box);
+
+  dupSuggestionEl = box;
+  return box;
+}
+
+function findSimilarIssuesForNewIssue(descText) {
+  const q = normalizeForCompare(descText);
+  if (!q) return { exact: null, suggestions: [] };
+
+  const qTokens = tokenize(q);
+  const suggestions = [];
+
+  for (const it of issues) {
+    const cand = normalizeForCompare(it.issueDescription || "");
+    if (!cand) continue;
+
+    // Exact duplicate (normalized)
+    if (cand === q) {
+      return { exact: it, suggestions: [] };
+    }
+
+    // Similarity using token overlap
+    const score = jaccardScore(qTokens, tokenize(cand));
+    if (score >= 0.45) {
+      suggestions.push({ issue: it, score });
+    }
+  }
+
+  suggestions.sort((a, b) => b.score - a.score);
+  return { exact: null, suggestions: suggestions.slice(0, 3) };
+}
+
+function renderDuplicateSuggestions() {
+  const box = ensureDupSuggestionBox();
+  if (!box) return;
+
+  const text = (issueDescription?.value || "").trim();
+  if (!text) {
+    box.classList.add("hidden");
+    box.innerHTML = "";
+    return;
+  }
+
+  const { exact, suggestions } = findSimilarIssuesForNewIssue(text);
+
+  if (!exact && !suggestions.length) {
+    box.classList.add("hidden");
+    box.innerHTML = "";
+    return;
+  }
+
+  if (exact) {
+    box.classList.remove("hidden");
+    box.innerHTML = `
+      <div class="dup-title-text">A similar issue already exists.</div>
+      <div class="hint" style="margin-top:6px;">This looks like an exact duplicate (by description).</div>
+      <div class="dup-list">
+        <div class="dup-item">
+          <div><strong>${escapeHtml(exact.issueDescription || "")}</strong></div>
+          <div class="dup-score">${escapeHtml(exact.application || "")}</div>
+        </div>
+      </div>
+      <div class="hint" style="margin-top:10px;">Tip: Open it in Common Issues and edit instead of adding again.</div>
+    `;
+    return;
+  }
+
+  box.classList.remove("hidden");
+  box.innerHTML = `
+    <div class="dup-title-text">We see similar issues already added. Can you check if it is related?</div>
+    <div class="dup-list">
+      ${suggestions
+        .map(
+          ({ issue, score }) => `
+          <div class="dup-item">
+            <div><strong>${escapeHtml(issue.issueDescription || "")}</strong></div>
+            <div class="dup-score">${escapeHtml(issue.application || "")} • Similarity ${(score * 100).toFixed(0)}%</div>
+          </div>
+        `
+        )
+        .join("")}
+    </div>
+  `;
+}
+
+issueDescription?.addEventListener("input", () => {
+  // If issues not loaded yet, suggestions won't show; once loaded, we re-render
+  renderDuplicateSuggestions();
+});
 
 /* =========
    Firestore
@@ -221,6 +355,9 @@ async function loadIssuesFromFirestore() {
   }
 
   renderIssueList();
+
+  // Update duplicate suggestions now that we have data
+  renderDuplicateSuggestions();
 
   if (isInDetailScreen() && selectedIssueId) {
     renderSelectedIssueDetails();
@@ -349,7 +486,7 @@ addTemplateBtn?.addEventListener("click", () => {
 });
 
 /* =========
-   Common Issues list
+   Common Issues list (with 3-dot delete menu)
 ========= */
 
 function getFilteredIssues() {
@@ -367,8 +504,64 @@ function getFilteredIssues() {
   });
 }
 
+function closeAllIssueMenus() {
+  openMenuIssueId = null;
+  document.querySelectorAll(".issue-menu").forEach(m => m.remove());
+}
+
+function toggleIssueMenu({ issueId, anchorEl }) {
+  // If already open for same issue -> close
+  if (openMenuIssueId === issueId) {
+    closeAllIssueMenus();
+    return;
+  }
+
+  closeAllIssueMenus();
+  openMenuIssueId = issueId;
+
+  const menu = document.createElement("div");
+  menu.className = "issue-menu";
+  menu.innerHTML = `
+    <button type="button" class="delete-btn" data-action="delete">Delete</button>
+  `;
+
+  anchorEl.parentElement?.appendChild(menu);
+
+  menu.querySelector('[data-action="delete"]')?.addEventListener("click", async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    await deleteIssueFlow(issueId);
+    closeAllIssueMenus();
+  });
+}
+
+async function deleteIssueFlow(issueId) {
+  const it = issues.find(x => x.id === issueId);
+  const label = it?.issueDescription ? `"${it.issueDescription}"` : "this issue";
+  const ok = confirm(`Delete ${label}? This cannot be undone.`);
+  if (!ok) return;
+
+  await deleteIssueFromFirestore(issueId);
+
+  // If you were viewing this issue in detail, go back to list
+  if (selectedIssueId === issueId) {
+    showListScreen();
+  }
+
+  await loadIssuesFromFirestore();
+}
+
+async function deleteIssueFromFirestore(docId) {
+  if (!ensureFirestoreReady()) return;
+  const { doc, deleteDoc } = window.firebaseFns;
+  const ref = doc(window.db, "issues", docId);
+  await deleteDoc(ref);
+}
+
 function renderIssueList() {
   if (!issueList || !issuesCountPill) return;
+
+  closeAllIssueMenus();
 
   const list = getFilteredIssues();
   issuesCountPill.textContent = String(list.length);
@@ -384,13 +577,32 @@ function renderIssueList() {
     const li = document.createElement("li");
     li.className = "issue-item";
     li.innerHTML = `
+      <button type="button" class="issue-menu-btn" aria-label="More actions">⋯</button>
       <div class="issue-item-title">${escapeHtml(it.issueDescription || "Untitled issue")}</div>
       <div class="issue-item-sub">${escapeHtml(it.application || "")}</div>
     `;
+
+    // Clicking the card opens details (unless action menu clicked)
     li.addEventListener("click", () => showDetailScreen(it.id));
+
+    // 3-dot menu button
+    const btn = li.querySelector(".issue-menu-btn");
+    btn?.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      toggleIssueMenu({ issueId: it.id, anchorEl: btn });
+    });
+
     issueList.appendChild(li);
   });
 }
+
+// Close menu when clicking anywhere else
+document.addEventListener("click", (e) => {
+  const inMenu = e.target.closest?.(".issue-menu");
+  const inBtn = e.target.closest?.(".issue-menu-btn");
+  if (!inMenu && !inBtn) closeAllIssueMenus();
+});
 
 searchInput?.addEventListener("input", () => {
   if (isInDetailScreen()) showListScreen();
@@ -581,7 +793,7 @@ async function updateIssueInFirestore(docId, updatedFields) {
 }
 
 /* =========
-   Save new issue
+   Save new issue (with duplicate check)
 ========= */
 
 function resetForm() {
@@ -596,12 +808,24 @@ function resetForm() {
   selectedTemplateIndex = 0;
   renderTemplateTabs();
   if (templateEditor) templateEditor.value = templateState[0].body;
+
+  // Clear duplicate suggestion UI
+  const box = ensureDupSuggestionBox();
+  if (box) {
+    box.classList.add("hidden");
+    box.innerHTML = "";
+  }
 }
 
 resetIssueBtn?.addEventListener("click", resetForm);
 
 saveIssueBtn?.addEventListener("click", async () => {
   if (!ensureFirestoreReady()) return;
+
+  // Ensure issues loaded before duplicate check
+  if (!issues.length) {
+    await loadIssuesFromFirestore();
+  }
 
   const desc = (issueDescription?.value || "").trim();
   const app = (applicationSelect?.value || "").trim();
@@ -614,6 +838,34 @@ saveIssueBtn?.addEventListener("click", async () => {
     alert("Please select an Application (or add a new one).");
     return;
   }
+
+  // Duplicate detection
+  const { exact, suggestions } = findSimilarIssuesForNewIssue(desc);
+
+  if (exact) {
+    const ok = confirm(
+      `This looks like an existing issue:\n\n- ${exact.issueDescription}\n\nDo you want to save anyway (creates a duplicate)?`
+    );
+    if (!ok) {
+      // send user to Common Issues for that issue
+      setActiveTab("common");
+      showListScreen();
+      if (searchInput) searchInput.value = exact.issueDescription || "";
+      renderIssueList();
+      return;
+    }
+  } else if (suggestions.length) {
+    const summary = suggestions
+      .map(s => `- ${s.issue.issueDescription} (${(s.score * 100).toFixed(0)}%)`)
+      .join("\n");
+    const ok = confirm(
+      `We found similar issues already added:\n\n${summary}\n\nDo you still want to save this as a new issue?`
+    );
+    if (!ok) return;
+  }
+
+  // Keep the suggestion box updated
+  renderDuplicateSuggestions();
 
   if (templateEditor) templateState[selectedTemplateIndex].body = templateEditor.value;
 
@@ -662,7 +914,6 @@ let helpFlowState = {
   docConfirmed: false
 };
 
-// Suggest specific 409 types if user just types "409"
 function suggest409Variants() {
   const variants = issues
     .filter(it => normalizeForCompare(it.issueDescription || "").includes("409"))
@@ -685,13 +936,14 @@ function suggest409Variants() {
   `;
 }
 
-// Match issue by keywords / closest issueDescription
 function matchIssueByText(userIssueText = "") {
   const q = normalizeForCompare(userIssueText);
   if (!q) return null;
 
   let best = null;
   let bestScore = 0;
+
+  const qWords = q.split(" ").filter(Boolean);
 
   for (const it of issues) {
     const desc = normalizeForCompare(it.issueDescription || "");
@@ -701,12 +953,9 @@ function matchIssueByText(userIssueText = "") {
 
     let score = 0;
 
-    // Strong match on description
     if (desc.includes(q) || q.includes(desc)) score += 10;
 
-    // keyword overlap scoring
-    const words = q.split(" ").filter(Boolean);
-    for (const w of words) {
+    for (const w of qWords) {
       if (w.length < 3) continue;
       if (desc.includes(w)) score += 2;
       if (app.includes(w)) score += 1;
@@ -735,7 +984,6 @@ function compareChecklists({ standard = [], user = [] }) {
       missing.push(s.raw);
     }
   }
-
   return missing;
 }
 
@@ -849,7 +1097,6 @@ function renderHelpOutput({ matchedIssue, missingItems, userIssueText }) {
     </div>
   `;
 
-  // Wire 409 variant click-to-fill
   helpResults.querySelectorAll("button[data-suggest-issue]").forEach(btn => {
     btn.addEventListener("click", () => {
       const text = btn.getAttribute("data-suggest-issue") || "";
@@ -857,7 +1104,6 @@ function renderHelpOutput({ matchedIssue, missingItems, userIssueText }) {
     });
   });
 
-  // Step 3 trigger (doc no luck)
   document.getElementById("btnDocNoLuck")?.addEventListener("click", () => {
     helpFlowState.docConfirmed = true;
     renderStep3Prompt();
@@ -871,14 +1117,13 @@ function buildChatGPTPrompt() {
   const checks = helpFlowState.lastUserChecks || [];
 
   const suspectedRootCause = matched?.rootCause ? matched.rootCause : "Unknown / needs investigation";
-
   const stdChecklist = matched?.checklistItems || [];
 
   const missingBlock = missing.length
     ? `Missing checks (from the standard checklist that were NOT confirmed):\n- ${missing.join("\n- ")}\n`
     : `Missing checks: None (all standard checks appear completed).\n`;
 
-  const prompt = `
+  return `
 You are helping troubleshoot an Aquera integration issue.
 
 Issue description:
@@ -911,8 +1156,6 @@ I will attach:
 - The integration / customer script JSON file
 - Ticket details (error code, timestamps, affected user, environment)
   `.trim();
-
-  return prompt;
 }
 
 function renderStep3Prompt() {
@@ -955,7 +1198,6 @@ function renderStep3Prompt() {
       await navigator.clipboard.writeText(text);
       alert("Prompt copied to clipboard.");
     } catch {
-      // Fallback
       if (box) {
         box.focus();
         box.select();
@@ -983,7 +1225,6 @@ async function handleHelpAnalyzeClick() {
   }
 
   const matched = matchIssueByText(issueText);
-
   const userChecksRaw = linesToBullets(checkedText).filter(isStepLikeLine);
 
   let missing = [];
@@ -992,16 +1233,12 @@ async function handleHelpAnalyzeClick() {
     missing = compareChecklists({ standard, user: userChecksRaw });
   }
 
-  // Save state for Step 3 prompt
   helpFlowState.lastUserIssue = issueText;
   helpFlowState.lastMatchedIssue = matched;
   helpFlowState.lastUserChecks = userChecksRaw;
   helpFlowState.lastMissing = missing;
   helpFlowState.docConfirmed = false;
 
-  // If match exists and missing exists -> show missing and keep step2 visible
-  // If match exists and missing none -> show "checked everything" + step2
-  // If no match -> step2 directly
   renderHelpOutput({ matchedIssue: matched, missingItems: missing, userIssueText: issueText });
 }
 
@@ -1053,6 +1290,7 @@ if (themeToggle) {
   });
 }
 
+// App init
 async function init() {
   applySavedTheme();
   loadApplicationOptions();

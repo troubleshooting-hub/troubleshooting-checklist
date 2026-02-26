@@ -10,7 +10,7 @@
   <title>Troubleshooting Checklist Portal</title>
 
   <!-- Use absolute path under the repo -->
-  <link rel="stylesheet" href="style.css?v=30" />
+  <link rel="stylesheet" href="style.css?v=31" />
 </head>
 
 <body>
@@ -141,6 +141,21 @@
       <div class="form-actions">
         <button id="saveIssueBtn" type="button" class="btn btn-primary">Save</button>
         <button id="resetIssueBtn" type="button" class="btn btn-secondary">Reset</button>
+      </div>
+
+      <!-- Duplicate Suggestions (shown only when similar issues exist) -->
+      <div id="dupBox" class="dup-box hidden" aria-live="polite">
+        <div class="dup-head">
+          <div class="dup-title-text">We found similar issues already added.</div>
+          <div class="dup-sub-text">Can you check if it is related?</div>
+        </div>
+
+        <div id="dupList" class="dup-list"></div>
+
+        <div class="dup-actions">
+          <button id="dupSaveAnywayBtn" type="button" class="btn btn-primary">Save anyway</button>
+          <button id="dupCancelBtn" type="button" class="btn btn-secondary">Cancel</button>
+        </div>
       </div>
 
     </div>
@@ -324,7 +339,7 @@
 
   // Load script.js only after Firebase globals exist
   const s = document.createElement("script");
-  s.src = "/troubleshooting-checklist/script.js?v=30";
+  s.src = "/troubleshooting-checklist/script.js?v=31";
   s.defer = true;
   document.body.appendChild(s);
 </script>
