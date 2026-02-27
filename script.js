@@ -1,18 +1,13 @@
 /* =========================================================
-   Troubleshooting Checklist Portal (NO API / NO Cloudflare)
-   Help Me Troubleshoot Flow:
-   Step 1: Match issue -> compare user checklist vs saved checklist -> show missing
-   Step 2: If complete OR no match -> show doc link + wait for user confirmation
-   Step 3: If user says doc checked/no luck -> generate ChatGPT-ready prompt
-
-   Additions in this version:
-   - Duplicate detection (New Issues): shows a suggestion box + confirms on Save if near-duplicate/exact duplicate
-   - Delete from Common Issues list: 3-dot menu per issue -> Delete (Firestore)
-
-   UPDATE requested:
-   - Keep the same code, but move the 3-dot button to the END (right side) of each issue row
-   - Ensure clicking dots does not open details
-   - Ensure menu appears anchored to the button (right side)
+   Troubleshooting Checklist Portal
+   UPDATE in this version:
+   - 3-dot menu stays at END (right side) of each issue row
+   - Clicking dots does NOT open details
+   - Menu is anchored to the button (right side)
+   - Recycle Bin support (soft delete + restore):
+       * Delete moves issue to "Deleted / Bin" view (sets { deleted: true, deletedAt })
+       * Restore brings it back (sets { deleted: false, deletedAt: null })
+   - Works even if Bin tab/section is not yet in index.html (fails gracefully)
 ========================================================= */
 
 /* =========
@@ -39,9 +34,7 @@ function linesToBullets(text = "") {
 
 function bulletsToHtml(items = []) {
   if (!items.length) return "<div class='muted'>No checklist items.</div>";
-  return `<ul class="bullet-list">${items
-    .map(li => `<li>${escapeHtml(li)}</li>`)
-    .join("")}</ul>`;
+  return `<ul class="bullet-list">${items.map(li => `<li>${escapeHtml(li)}</li>`).join("")}</ul>`;
 }
 
 function safeUrl(url) {
@@ -169,7 +162,10 @@ Regards,`
   }
 ];
 
-let issues = [];
+let allIssues = [];        // includes active + deleted
+let issues = [];           // active only (derived)
+let deletedIssues = [];    // deleted only (derived)
+
 let selectedIssueId = null;
 
 let selectedTemplateIndex = 0;
@@ -177,6 +173,9 @@ let templateState = structuredClone(DEFAULT_TEMPLATES);
 
 // Used for list 3-dot menus
 let openMenuIssueId = null;
+
+// Simple view router (common/new/help/bin)
+let activeView = "common";
 
 /* =========
    DOM
@@ -186,9 +185,15 @@ const tabCommon = document.getElementById("tabCommon");
 const tabNew = document.getElementById("tabNew");
 const tabHelp = document.getElementById("tabHelp");
 
+// Optional (only if you add these in index.html later)
+const tabBin = document.getElementById("tabBin");
+
 const commonSection = document.getElementById("commonSection");
 const newSection = document.getElementById("newSection");
 const helpSection = document.getElementById("helpSection");
+
+// Optional (only if you add these in index.html later)
+const binSection = document.getElementById("binSection");
 
 const searchInput = document.getElementById("searchInput");
 
@@ -199,6 +204,10 @@ const backToListBtn = document.getElementById("backToListBtn");
 const issueList = document.getElementById("issueList");
 const issueDetailsPanel = document.getElementById("issueDetailsPanel");
 const issuesCountPill = document.getElementById("issuesCountPill");
+
+// Optional bin list UI (only if you add these in index.html later)
+const binList = document.getElementById("binList");
+const binCountPill = document.getElementById("binCountPill");
 
 // Form
 const issueDescription = document.getElementById("issueDescription");
@@ -216,7 +225,7 @@ const addTemplateBtn = document.getElementById("addTemplateBtn");
 const saveIssueBtn = document.getElementById("saveIssueBtn");
 const resetIssueBtn = document.getElementById("resetIssueBtn");
 
-// Help (new flow elements expected in updated index.html)
+// Help
 const helpIssueInput = document.getElementById("helpIssueInput");
 const helpCheckedInput = document.getElementById("helpCheckedInput");
 const helpAnalyzeBtn = document.getElementById("helpAnalyzeBtn");
@@ -224,7 +233,7 @@ const helpClearBtn = document.getElementById("helpClearBtn");
 const helpResults = document.getElementById("helpResults");
 
 /* =========
-   Duplicate suggestion UI (created dynamically)
+   Duplicate suggestion UI
 ========= */
 
 let dupSuggestionEl = null;
@@ -233,7 +242,7 @@ function ensureDupSuggestionBox() {
   if (dupSuggestionEl) return dupSuggestionEl;
   if (!issueDescription) return null;
 
-  const wrap = issueDescription.parentElement; // .form-row
+  const wrap = issueDescription.parentElement;
   if (!wrap) return null;
 
   const box = document.createElement("div");
@@ -261,9 +270,7 @@ function findSimilarIssuesForNewIssue(descText) {
     }
 
     const score = jaccardScore(qTokens, tokenize(cand));
-    if (score >= 0.45) {
-      suggestions.push({ issue: it, score });
-    }
+    if (score >= 0.45) suggestions.push({ issue: it, score });
   }
 
   suggestions.sort((a, b) => b.score - a.score);
@@ -323,9 +330,7 @@ function renderDuplicateSuggestions() {
   `;
 }
 
-issueDescription?.addEventListener("input", () => {
-  renderDuplicateSuggestions();
-});
+issueDescription?.addEventListener("input", renderDuplicateSuggestions);
 
 /* =========
    Firestore
@@ -339,6 +344,12 @@ function ensureFirestoreReady() {
   return true;
 }
 
+function splitActiveDeleted() {
+  // Treat anything with deleted === true as deleted
+  issues = allIssues.filter(x => !x?.deleted);
+  deletedIssues = allIssues.filter(x => !!x?.deleted);
+}
+
 async function loadIssuesFromFirestore() {
   if (!ensureFirestoreReady()) return;
 
@@ -348,14 +359,17 @@ async function loadIssuesFromFirestore() {
   try {
     const q = query(colRef, orderBy("createdAt", "desc"));
     const snap = await getDocs(q);
-    issues = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    allIssues = snap.docs.map(d => ({ id: d.id, ...d.data() }));
   } catch (e) {
     console.warn("OrderBy(createdAt) failed, falling back to unsorted getDocs()", e);
     const snap = await getDocs(colRef);
-    issues = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    allIssues = snap.docs.map(d => ({ id: d.id, ...d.data() }));
   }
 
+  splitActiveDeleted();
+
   renderIssueList();
+  renderBinList();         // safe even if bin UI doesn't exist
   renderDuplicateSuggestions();
 
   if (isInDetailScreen() && selectedIssueId) {
@@ -363,31 +377,73 @@ async function loadIssuesFromFirestore() {
   }
 }
 
+async function softDeleteIssueInFirestore(docId) {
+  if (!ensureFirestoreReady()) return;
+
+  const { doc, updateDoc, serverTimestamp } = window.firebaseFns;
+  const ref = doc(window.db, "issues", docId);
+  await updateDoc(ref, {
+    deleted: true,
+    deletedAt: serverTimestamp()
+  });
+}
+
+async function restoreIssueInFirestore(docId) {
+  if (!ensureFirestoreReady()) return;
+
+  const { doc, updateDoc } = window.firebaseFns;
+  const ref = doc(window.db, "issues", docId);
+  await updateDoc(ref, {
+    deleted: false,
+    deletedAt: null
+  });
+}
+
+// Optional: permanently delete from DB (only from bin)
+async function hardDeleteIssueFromFirestore(docId) {
+  if (!ensureFirestoreReady()) return;
+
+  const { doc, deleteDoc } = window.firebaseFns;
+  const ref = doc(window.db, "issues", docId);
+  await deleteDoc(ref);
+}
+
 /* =========
-   Tabs
+   Tabs / Sections
 ========= */
 
-function setActiveTab(tab) {
-  const isCommon = tab === "common";
-  const isNew = tab === "new";
-  const isHelp = tab === "help";
+function showOnlySection(which) {
+  activeView = which;
+
+  const isCommon = which === "common";
+  const isNew = which === "new";
+  const isHelp = which === "help";
+  const isBin = which === "bin";
 
   tabCommon?.classList.toggle("active", isCommon);
   tabNew?.classList.toggle("active", isNew);
   tabHelp?.classList.toggle("active", isHelp);
+  tabBin?.classList.toggle("active", isBin);
 
   commonSection?.classList.toggle("hidden", !isCommon);
   newSection?.classList.toggle("hidden", !isNew);
   helpSection?.classList.toggle("hidden", !isHelp);
+  binSection?.classList.toggle("hidden", !isBin);
 
+  // Search only for common list
   if (searchInput) searchInput.style.display = isCommon ? "" : "none";
 
+  // If leaving common, reset to list view
   if (!isCommon) showListScreen();
+
+  // Close any open menus on tab changes
+  closeAllIssueMenus();
 }
 
-tabCommon?.addEventListener("click", () => setActiveTab("common"));
-tabNew?.addEventListener("click", () => setActiveTab("new"));
-tabHelp?.addEventListener("click", () => setActiveTab("help"));
+tabCommon?.addEventListener("click", () => showOnlySection("common"));
+tabNew?.addEventListener("click", () => showOnlySection("new"));
+tabHelp?.addEventListener("click", () => showOnlySection("help"));
+tabBin?.addEventListener("click", () => showOnlySection("bin"));
 
 /* =========
    Common Issues screens
@@ -485,7 +541,7 @@ addTemplateBtn?.addEventListener("click", () => {
 });
 
 /* =========
-   Common Issues list (with 3-dot delete menu)
+   Common Issues list + Menus
 ========= */
 
 function getFilteredIssues() {
@@ -498,7 +554,9 @@ function getFilteredIssues() {
       it.application,
       it.rootCause,
       ...(it.checklistItems || [])
-    ].join(" ").toLowerCase();
+    ]
+      .join(" ")
+      .toLowerCase();
     return hay.includes(q);
   });
 }
@@ -508,7 +566,8 @@ function closeAllIssueMenus() {
   document.querySelectorAll(".issue-menu").forEach(m => m.remove());
 }
 
-function toggleIssueMenu({ issueId, anchorEl }) {
+function toggleIssueMenu({ issueId, anchorEl, mode }) {
+  // mode: "active" (Delete) or "bin" (Restore / Delete permanently)
   if (openMenuIssueId === issueId) {
     closeAllIssueMenus();
     return;
@@ -519,15 +578,38 @@ function toggleIssueMenu({ issueId, anchorEl }) {
 
   const menu = document.createElement("div");
   menu.className = "issue-menu";
-  menu.innerHTML = `<button type="button" class="delete-btn" data-action="delete">Delete</button>`;
 
-  // Append inside the li (issue-item) so it can position relative to it via CSS
-  anchorEl.parentElement?.appendChild(menu);
+  if (mode === "bin") {
+    menu.innerHTML = `
+      <button type="button" class="menu-item" data-action="restore">Restore</button>
+      <button type="button" class="menu-item danger" data-action="hard-delete">Delete permanently</button>
+    `;
+  } else {
+    menu.innerHTML = `
+      <button type="button" class="menu-item danger" data-action="delete">Move to Bin</button>
+    `;
+  }
 
-  menu.querySelector('[data-action="delete"]')?.addEventListener("click", async (e) => {
+  // Append inside the li (issue-item); CSS positions menu absolute top/right
+  const li = anchorEl.closest(".issue-item");
+  li?.appendChild(menu);
+
+  menu.addEventListener("click", async (e) => {
+    const btn = e.target.closest("button[data-action]");
+    if (!btn) return;
+
     e.preventDefault();
     e.stopPropagation();
-    await deleteIssueFlow(issueId);
+
+    const action = btn.getAttribute("data-action");
+    if (action === "delete") {
+      await deleteIssueFlow(issueId);
+    } else if (action === "restore") {
+      await restoreIssueFlow(issueId);
+    } else if (action === "hard-delete") {
+      await hardDeleteIssueFlow(issueId);
+    }
+
     closeAllIssueMenus();
   });
 }
@@ -535,23 +617,35 @@ function toggleIssueMenu({ issueId, anchorEl }) {
 async function deleteIssueFlow(issueId) {
   const it = issues.find(x => x.id === issueId);
   const label = it?.issueDescription ? `"${it.issueDescription}"` : "this issue";
-  const ok = confirm(`Delete ${label}? This cannot be undone.`);
+  const ok = confirm(`Move ${label} to Bin?`);
   if (!ok) return;
 
-  await deleteIssueFromFirestore(issueId);
+  await softDeleteIssueInFirestore(issueId);
 
-  if (selectedIssueId === issueId) {
-    showListScreen();
-  }
+  // If viewing this issue, go back to list
+  if (selectedIssueId === issueId) showListScreen();
 
   await loadIssuesFromFirestore();
 }
 
-async function deleteIssueFromFirestore(docId) {
-  if (!ensureFirestoreReady()) return;
-  const { doc, deleteDoc } = window.firebaseFns;
-  const ref = doc(window.db, "issues", docId);
-  await deleteDoc(ref);
+async function restoreIssueFlow(issueId) {
+  const it = deletedIssues.find(x => x.id === issueId);
+  const label = it?.issueDescription ? `"${it.issueDescription}"` : "this issue";
+  const ok = confirm(`Restore ${label}?`);
+  if (!ok) return;
+
+  await restoreIssueInFirestore(issueId);
+  await loadIssuesFromFirestore();
+}
+
+async function hardDeleteIssueFlow(issueId) {
+  const it = deletedIssues.find(x => x.id === issueId);
+  const label = it?.issueDescription ? `"${it.issueDescription}"` : "this issue";
+  const ok = confirm(`Permanently delete ${label}? This cannot be undone.`);
+  if (!ok) return;
+
+  await hardDeleteIssueFromFirestore(issueId);
+  await loadIssuesFromFirestore();
 }
 
 function renderIssueList() {
@@ -573,26 +667,76 @@ function renderIssueList() {
     const li = document.createElement("li");
     li.className = "issue-item";
 
-    // IMPORTANT: Put text content first, and 3-dot button LAST (right side).
     li.innerHTML = `
       <div class="issue-item-main">
         <div class="issue-item-title">${escapeHtml(it.issueDescription || "Untitled issue")}</div>
         <div class="issue-item-sub">${escapeHtml(it.application || "")}</div>
       </div>
-      <button type="button" class="issue-menu-btn" aria-label="More actions">⋯</button>
+
+      <div class="issue-item-actions">
+        <button type="button" class="issue-menu-btn" aria-label="More actions">⋯</button>
+      </div>
     `;
 
-    // Clicking the row opens details, unless menu button is clicked.
+    // Row click opens details
     li.addEventListener("click", () => showDetailScreen(it.id));
 
-    const btn = li.querySelector(".issue-menu-btn");
-    btn?.addEventListener("click", (e) => {
+    // Dots click opens menu only (no navigation)
+    const dots = li.querySelector(".issue-menu-btn");
+    dots?.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
-      toggleIssueMenu({ issueId: it.id, anchorEl: btn });
+      toggleIssueMenu({ issueId: it.id, anchorEl: dots, mode: "active" });
     });
 
     issueList.appendChild(li);
+  });
+}
+
+function renderBinList() {
+  // If you haven't added the Bin section in HTML yet, do nothing
+  if (!binList || !binCountPill) return;
+
+  closeAllIssueMenus();
+
+  binCountPill.textContent = String(deletedIssues.length);
+
+  if (!deletedIssues.length) {
+    binList.innerHTML = `<li class="empty-state">Bin is empty.</li>`;
+    return;
+  }
+
+  binList.innerHTML = "";
+
+  deletedIssues.forEach(it => {
+    const li = document.createElement("li");
+    li.className = "issue-item";
+
+    li.innerHTML = `
+      <div class="issue-item-main">
+        <div class="issue-item-title">${escapeHtml(it.issueDescription || "Untitled issue")}</div>
+        <div class="issue-item-sub">${escapeHtml(it.application || "")}</div>
+      </div>
+
+      <div class="issue-item-actions">
+        <button type="button" class="issue-menu-btn" aria-label="More actions">⋯</button>
+      </div>
+    `;
+
+    // In bin, clicking row does NOT open detail (optional) — keep it simple.
+    li.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+    });
+
+    const dots = li.querySelector(".issue-menu-btn");
+    dots?.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      toggleIssueMenu({ issueId: it.id, anchorEl: dots, mode: "bin" });
+    });
+
+    binList.appendChild(li);
   });
 }
 
@@ -820,9 +964,8 @@ resetIssueBtn?.addEventListener("click", resetForm);
 saveIssueBtn?.addEventListener("click", async () => {
   if (!ensureFirestoreReady()) return;
 
-  if (!issues.length) {
-    await loadIssuesFromFirestore();
-  }
+  // Ensure loaded before duplicate check
+  if (!issues.length && !allIssues.length) await loadIssuesFromFirestore();
 
   const desc = (issueDescription?.value || "").trim();
   const app = (applicationSelect?.value || "").trim();
@@ -843,7 +986,7 @@ saveIssueBtn?.addEventListener("click", async () => {
       `This looks like an existing issue:\n\n- ${exact.issueDescription}\n\nDo you want to save anyway (creates a duplicate)?`
     );
     if (!ok) {
-      setActiveTab("common");
+      showOnlySection("common");
       showListScreen();
       if (searchInput) searchInput.value = exact.issueDescription || "";
       renderIssueList();
@@ -874,6 +1017,8 @@ saveIssueBtn?.addEventListener("click", async () => {
       name: (t.name || "").trim(),
       body: (t.body || "").trim()
     })),
+    deleted: false,
+    deletedAt: null,
     createdAt: window.firebaseFns.serverTimestamp(),
     updatedAt: window.firebaseFns.serverTimestamp()
   };
@@ -884,7 +1029,7 @@ saveIssueBtn?.addEventListener("click", async () => {
     await addDoc(colRef, payload);
 
     resetForm();
-    setActiveTab("common");
+    showOnlySection("common");
     showListScreen();
     await loadIssuesFromFirestore();
   } catch (e) {
@@ -974,9 +1119,7 @@ function compareChecklists({ standard = [], user = [] }) {
 
   const missing = [];
   for (const s of std) {
-    if (!usrSet.has(s.norm)) {
-      missing.push(s.raw);
-    }
+    if (!usrSet.has(s.norm)) missing.push(s.raw);
   }
   return missing;
 }
@@ -1284,14 +1427,13 @@ if (themeToggle) {
   });
 }
 
-// App init
 async function init() {
   applySavedTheme();
   loadApplicationOptions();
   renderTemplateTabs();
   if (templateEditor) templateEditor.value = templateState[0].body;
 
-  setActiveTab("common");
+  showOnlySection("common");
   showListScreen();
 
   await loadIssuesFromFirestore();

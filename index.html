@@ -10,7 +10,7 @@
   <title>Troubleshooting Checklist Portal</title>
 
   <!-- Use absolute path under the repo -->
-  <link rel="stylesheet" href="style.css?v=31" />
+  <link rel="stylesheet" href="style.css?v=32" />
 </head>
 
 <body>
@@ -38,6 +38,11 @@
     <button id="tabCommon" class="tab-btn active" type="button">Common Issues</button>
     <button id="tabNew" class="tab-btn" type="button">New Issues</button>
     <button id="tabHelp" class="tab-btn" type="button">Help me troubleshoot</button>
+
+    <!-- NEW: Bin / Recycle tab -->
+    <button id="tabBin" class="tab-btn" type="button">
+      Bin <span class="pill muted-pill" id="binCountPillTab">0</span>
+    </button>
   </div>
 
   <div class="search-row">
@@ -75,6 +80,24 @@
         <span class="pill muted-pill">Issue Details</span>
       </div>
       <div id="issueDetailsPanel"></div>
+    </div>
+  </section>
+
+  <!-- NEW: BIN / RECYCLE -->
+  <section id="binSection" class="section hidden">
+    <div class="section-title">
+      <h2>Recycle Bin</h2>
+      <div class="muted">Deleted issues will appear here. You can restore them or permanently delete them.</div>
+    </div>
+
+    <div class="card list-card">
+      <div class="card-head">
+        <div class="card-title">Deleted Issues</div>
+        <div class="pill muted-pill" id="binCountPill">0</div>
+      </div>
+      <ul class="issue-list" id="binIssueList">
+        <li class="empty-state">Bin is empty.</li>
+      </ul>
     </div>
   </section>
 
@@ -339,7 +362,7 @@
 
   // Load script.js only after Firebase globals exist
   const s = document.createElement("script");
-  s.src = "/troubleshooting-checklist/script.js?v=31";
+  s.src = "/troubleshooting-checklist/script.js?v=32";
   s.defer = true;
   document.body.appendChild(s);
 </script>
