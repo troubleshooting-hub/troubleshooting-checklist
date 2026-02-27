@@ -8,6 +8,11 @@
    Additions in this version:
    - Duplicate detection (New Issues): shows a suggestion box + confirms on Save if near-duplicate/exact duplicate
    - Delete from Common Issues list: 3-dot menu per issue -> Delete (Firestore)
+
+   UPDATE requested:
+   - Keep the same code, but move the 3-dot button to the END (right side) of each issue row
+   - Ensure clicking dots does not open details
+   - Ensure menu appears anchored to the button (right side)
 ========================================================= */
 
 /* =========
@@ -228,7 +233,6 @@ function ensureDupSuggestionBox() {
   if (dupSuggestionEl) return dupSuggestionEl;
   if (!issueDescription) return null;
 
-  // Insert right after Issue Description input
   const wrap = issueDescription.parentElement; // .form-row
   if (!wrap) return null;
 
@@ -252,12 +256,10 @@ function findSimilarIssuesForNewIssue(descText) {
     const cand = normalizeForCompare(it.issueDescription || "");
     if (!cand) continue;
 
-    // Exact duplicate (normalized)
     if (cand === q) {
       return { exact: it, suggestions: [] };
     }
 
-    // Similarity using token overlap
     const score = jaccardScore(qTokens, tokenize(cand));
     if (score >= 0.45) {
       suggestions.push({ issue: it, score });
@@ -322,7 +324,6 @@ function renderDuplicateSuggestions() {
 }
 
 issueDescription?.addEventListener("input", () => {
-  // If issues not loaded yet, suggestions won't show; once loaded, we re-render
   renderDuplicateSuggestions();
 });
 
@@ -355,8 +356,6 @@ async function loadIssuesFromFirestore() {
   }
 
   renderIssueList();
-
-  // Update duplicate suggestions now that we have data
   renderDuplicateSuggestions();
 
   if (isInDetailScreen() && selectedIssueId) {
@@ -510,7 +509,6 @@ function closeAllIssueMenus() {
 }
 
 function toggleIssueMenu({ issueId, anchorEl }) {
-  // If already open for same issue -> close
   if (openMenuIssueId === issueId) {
     closeAllIssueMenus();
     return;
@@ -521,10 +519,9 @@ function toggleIssueMenu({ issueId, anchorEl }) {
 
   const menu = document.createElement("div");
   menu.className = "issue-menu";
-  menu.innerHTML = `
-    <button type="button" class="delete-btn" data-action="delete">Delete</button>
-  `;
+  menu.innerHTML = `<button type="button" class="delete-btn" data-action="delete">Delete</button>`;
 
+  // Append inside the li (issue-item) so it can position relative to it via CSS
   anchorEl.parentElement?.appendChild(menu);
 
   menu.querySelector('[data-action="delete"]')?.addEventListener("click", async (e) => {
@@ -543,7 +540,6 @@ async function deleteIssueFlow(issueId) {
 
   await deleteIssueFromFirestore(issueId);
 
-  // If you were viewing this issue in detail, go back to list
   if (selectedIssueId === issueId) {
     showListScreen();
   }
@@ -576,16 +572,19 @@ function renderIssueList() {
   list.forEach(it => {
     const li = document.createElement("li");
     li.className = "issue-item";
+
+    // IMPORTANT: Put text content first, and 3-dot button LAST (right side).
     li.innerHTML = `
+      <div class="issue-item-main">
+        <div class="issue-item-title">${escapeHtml(it.issueDescription || "Untitled issue")}</div>
+        <div class="issue-item-sub">${escapeHtml(it.application || "")}</div>
+      </div>
       <button type="button" class="issue-menu-btn" aria-label="More actions">⋯</button>
-      <div class="issue-item-title">${escapeHtml(it.issueDescription || "Untitled issue")}</div>
-      <div class="issue-item-sub">${escapeHtml(it.application || "")}</div>
     `;
 
-    // Clicking the card opens details (unless action menu clicked)
+    // Clicking the row opens details, unless menu button is clicked.
     li.addEventListener("click", () => showDetailScreen(it.id));
 
-    // 3-dot menu button
     const btn = li.querySelector(".issue-menu-btn");
     btn?.addEventListener("click", (e) => {
       e.preventDefault();
@@ -597,7 +596,7 @@ function renderIssueList() {
   });
 }
 
-// Close menu when clicking anywhere else
+// Close menu when clicking elsewhere
 document.addEventListener("click", (e) => {
   const inMenu = e.target.closest?.(".issue-menu");
   const inBtn = e.target.closest?.(".issue-menu-btn");
@@ -809,7 +808,6 @@ function resetForm() {
   renderTemplateTabs();
   if (templateEditor) templateEditor.value = templateState[0].body;
 
-  // Clear duplicate suggestion UI
   const box = ensureDupSuggestionBox();
   if (box) {
     box.classList.add("hidden");
@@ -822,7 +820,6 @@ resetIssueBtn?.addEventListener("click", resetForm);
 saveIssueBtn?.addEventListener("click", async () => {
   if (!ensureFirestoreReady()) return;
 
-  // Ensure issues loaded before duplicate check
   if (!issues.length) {
     await loadIssuesFromFirestore();
   }
@@ -839,7 +836,6 @@ saveIssueBtn?.addEventListener("click", async () => {
     return;
   }
 
-  // Duplicate detection
   const { exact, suggestions } = findSimilarIssuesForNewIssue(desc);
 
   if (exact) {
@@ -847,7 +843,6 @@ saveIssueBtn?.addEventListener("click", async () => {
       `This looks like an existing issue:\n\n- ${exact.issueDescription}\n\nDo you want to save anyway (creates a duplicate)?`
     );
     if (!ok) {
-      // send user to Common Issues for that issue
       setActiveTab("common");
       showListScreen();
       if (searchInput) searchInput.value = exact.issueDescription || "";
@@ -864,7 +859,6 @@ saveIssueBtn?.addEventListener("click", async () => {
     if (!ok) return;
   }
 
-  // Keep the suggestion box updated
   renderDuplicateSuggestions();
 
   if (templateEditor) templateState[selectedTemplateIndex].body = templateEditor.value;
