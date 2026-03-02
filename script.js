@@ -1,17 +1,17 @@
 /* =========================================================
-   Troubleshooting Checklist Portal
-   - 3-dot menu stays at END (right side) of each issue row
-   - Clicking dots does NOT open details
-   - Menu is anchored to the button (right side)
-   - Recycle Bin support (soft delete + restore)
-   - AUTH GATE (Email/Password + Google):
-       * Shows login/register page until user is authenticated
-       * Loads Firestore ONLY after successful login
-   IMPORTANT FIXES IN THIS VERSION:
-   - Uses the *actual* IDs from your index.html:
-       googleSignInBtn, emailSignInBtn, emailRegisterBtn, authLogoutBtn, authEmail, authPassword, authError
-   - Uses window.firebaseAuthFns (must be set in index.html)
-   - Prevents "Google sign-in loops back to login" by relying on onAuthStateChanged to swap UI
+   Troubleshooting Checklist Portal — UPDATED AUTH FLOWS
+   Adds:
+   - Login (email/password) with inline errors + loading state
+   - Signup view toggle (no new page)
+   - Forgot password view + sendPasswordResetEmail
+   - Password show/hide toggle
+   - Auth loading overlay so no partial UI
+   - Keeps portal logic unchanged
+   Notes:
+   - Uses IDs from your current index.html:
+     authCardTitle, authBottomText, authToggleModeBtn, authForgotBtn, authTogglePwBtn,
+     authEmail, authPassword, emailSignInBtn, googleSignInBtn, authLogoutBtn, authError
+   - Works on GitHub Pages with <base href="/troubleshooting-checklist/">
 ========================================================= */
 
 /* =========
@@ -229,11 +229,17 @@ const helpClearBtn = document.getElementById("helpClearBtn");
 const helpResults = document.getElementById("helpResults");
 
 /* =========
-   Auth DOM (MATCHES YOUR index.html)
+   Auth DOM (YOUR index.html)
 ========= */
 
 const authGate = document.getElementById("authGate");
 const appRoot = document.getElementById("appRoot");
+
+const authCardTitle = document.getElementById("authCardTitle");
+const authBottomText = document.getElementById("authBottomText");
+const authToggleModeBtn = document.getElementById("authToggleModeBtn");
+const authForgotBtn = document.getElementById("authForgotBtn");
+const authTogglePwBtn = document.getElementById("authTogglePwBtn");
 
 const authEmail = document.getElementById("authEmail");
 const authPassword = document.getElementById("authPassword");
@@ -241,12 +247,27 @@ const authError = document.getElementById("authError");
 
 const googleSignInBtn = document.getElementById("googleSignInBtn");
 const emailSignInBtn = document.getElementById("emailSignInBtn");
-const emailRegisterBtn = document.getElementById("emailRegisterBtn"); // in your index.html
 const authLogoutBtn = document.getElementById("authLogoutBtn");
 
 /* =========
-   Auth helpers
+   Auth state + UI rendering
 ========= */
+
+const AUTH_VIEW = {
+  LOGIN: "login",
+  SIGNUP: "signup",
+  RESET: "reset"
+};
+
+let authView = AUTH_VIEW.LOGIN;
+let authBusy = false;
+let authLoadingEl = null;
+
+function ensureAuthReady() {
+  // index.html MUST set:
+  // window.auth and window.firebaseAuthFns
+  return !!(window.auth && window.firebaseAuthFns);
+}
 
 function setAuthError(msg = "") {
   if (!authError) return;
@@ -269,104 +290,93 @@ function showApp() {
   appRoot?.classList.remove("hidden");
 }
 
-function ensureAuthReady() {
-  // index.html MUST set:
-  // window.auth and window.firebaseAuthFns
-  return !!(window.auth && window.firebaseAuthFns);
+function setAuthBusy(isBusy, label = "Loading…") {
+  authBusy = !!isBusy;
+
+  const btns = [emailSignInBtn, googleSignInBtn, authToggleModeBtn, authForgotBtn, authTogglePwBtn].filter(Boolean);
+  btns.forEach(b => (b.disabled = authBusy));
+
+  if (!authGate) return;
+
+  if (authBusy) {
+    if (!authLoadingEl) {
+      const wrap = authGate.querySelector(".auth-card");
+      if (!wrap) return;
+
+      authLoadingEl = document.createElement("div");
+      authLoadingEl.className = "auth-loading";
+      authLoadingEl.innerHTML = `
+        <div class="auth-loading-inner">
+          <div class="auth-spinner" aria-hidden="true"></div>
+          <div class="auth-loading-text" id="authLoadingText">${escapeHtml(label)}</div>
+        </div>
+      `;
+      wrap.appendChild(authLoadingEl);
+    } else {
+      const t = authLoadingEl.querySelector("#authLoadingText");
+      if (t) t.textContent = label;
+      authLoadingEl.classList.remove("hidden");
+    }
+  } else {
+    authLoadingEl?.classList.add("hidden");
+  }
 }
 
-function bindAuthUI() {
-  if (!authGate || !appRoot) return;
+function mapAuthError(e) {
+  const code = e?.code || "";
+  // Keep messages user-friendly
+  if (code === "auth/invalid-email") return "Please enter a valid email address.";
+  if (code === "auth/missing-password") return "Please enter your password.";
+  if (code === "auth/wrong-password") return "Incorrect password. Please try again.";
+  if (code === "auth/user-not-found") return "No account found for this email.";
+  if (code === "auth/email-already-in-use") return "This email is already registered. Please login instead.";
+  if (code === "auth/too-many-requests") return "Too many attempts. Please wait a bit and try again.";
+  if (code === "auth/popup-closed-by-user") return "Google sign-in was closed. Please try again.";
+  if (code === "auth/cancelled-popup-request") return "";
+  return e?.message || "Authentication failed. Please try again.";
+}
 
-  // Email Sign-in
-  emailSignInBtn?.addEventListener("click", async () => {
-    if (!ensureAuthReady()) {
-      showAuthGate();
-      return setAuthError("Auth is not ready. Please verify Firebase Auth wiring in index.html and refresh.");
-    }
+function renderAuthView(nextView) {
+  authView = nextView;
 
-    const email = (authEmail?.value || "").trim();
-    const password = authPassword?.value || "";
+  setAuthError("");
 
-    if (!email) return setAuthError("Please enter your email.");
-    if (!password || password.length < 6) return setAuthError("Password must be at least 6 characters.");
+  // Always show forgot link only on login view
+  authForgotBtn?.classList.toggle("hidden", authView !== AUTH_VIEW.LOGIN);
 
-    setAuthError("");
+  // Show/hide password + eye on reset view
+  const pwWrap = authPassword?.closest(".auth-password-wrap");
+  pwWrap?.classList.toggle("hidden", authView === AUTH_VIEW.RESET);
+  if (authPassword && authView === AUTH_VIEW.RESET) authPassword.value = "";
 
-    const { signInWithEmailAndPassword } = window.firebaseAuthFns;
+  // Google button: still useful in login/signup; hide in reset
+  googleSignInBtn?.classList.toggle("hidden", authView === AUTH_VIEW.RESET);
 
-    try {
-      await signInWithEmailAndPassword(window.auth, email, password);
-      // UI swap handled by onAuthStateChanged
-    } catch (e) {
-      console.error(e);
-      setAuthError(e?.message || "Sign in failed. Please try again.");
-    }
-  });
+  // Divider: hide in reset
+  const divider = document.querySelector(".auth-divider");
+  divider?.classList.toggle("hidden", authView === AUTH_VIEW.RESET);
 
-  // Email Register
-  emailRegisterBtn?.addEventListener("click", async () => {
-    if (!ensureAuthReady()) {
-      showAuthGate();
-      return setAuthError("Auth is not ready. Please verify Firebase Auth wiring in index.html and refresh.");
-    }
+  // Update titles + button labels + bottom text/link
+  if (authView === AUTH_VIEW.LOGIN) {
+    if (authCardTitle) authCardTitle.textContent = "Login to your account";
+    if (emailSignInBtn) emailSignInBtn.textContent = "Login now";
+    if (authBottomText) authBottomText.textContent = "Don’t have an account?";
+    if (authToggleModeBtn) authToggleModeBtn.textContent = "Sign up";
+  }
 
-    const email = (authEmail?.value || "").trim();
-    const password = authPassword?.value || "";
+  if (authView === AUTH_VIEW.SIGNUP) {
+    if (authCardTitle) authCardTitle.textContent = "Create your account";
+    if (emailSignInBtn) emailSignInBtn.textContent = "Create account";
+    if (authBottomText) authBottomText.textContent = "Already have an account?";
+    if (authToggleModeBtn) authToggleModeBtn.textContent = "Login";
+  }
 
-    if (!email) return setAuthError("Please enter your email.");
-    if (!password || password.length < 6) return setAuthError("Password must be at least 6 characters.");
-
-    setAuthError("");
-
-    const { createUserWithEmailAndPassword } = window.firebaseAuthFns;
-
-    try {
-      await createUserWithEmailAndPassword(window.auth, email, password);
-      // UI swap handled by onAuthStateChanged
-    } catch (e) {
-      console.error(e);
-      setAuthError(e?.message || "Registration failed. Please try again.");
-    }
-  });
-
-  // Google Sign-in
-  googleSignInBtn?.addEventListener("click", async () => {
-    if (!ensureAuthReady()) {
-      showAuthGate();
-      return setAuthError("Auth is not ready. Please verify Firebase Auth wiring in index.html and refresh.");
-    }
-
-    const { signInWithPopup, GoogleAuthProvider } = window.firebaseAuthFns;
-    setAuthError("");
-
-    try {
-      const provider = new GoogleAuthProvider();
-      await signInWithPopup(window.auth, provider);
-      // UI swap handled by onAuthStateChanged
-    } catch (e) {
-      console.error(e);
-      setAuthError(e?.message || "Google sign-in failed. Please try again.");
-    }
-  });
-
-  // Logout button (in header)
-  authLogoutBtn?.addEventListener("click", async () => {
-    if (!ensureAuthReady()) return;
-
-    const { signOut } = window.firebaseAuthFns;
-    try {
-      await signOut(window.auth);
-    } catch (e) {
-      console.error(e);
-      alert("Could not sign out. Please refresh.");
-    }
-  });
-
-  // Enter key submits sign-in (nice UX)
-  authPassword?.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") emailSignInBtn?.click();
-  });
+  if (authView === AUTH_VIEW.RESET) {
+    if (authCardTitle) authCardTitle.textContent = "Reset your password";
+    if (emailSignInBtn) emailSignInBtn.textContent = "Send reset email";
+    if (authBottomText) authBottomText.textContent = "Remembered your password?";
+    if (authToggleModeBtn) authToggleModeBtn.textContent = "Back to login";
+  }
 }
 
 /* =========
@@ -444,6 +454,145 @@ async function hardDeleteIssueFromFirestore(docId) {
 }
 
 /* =========
+   Auth actions
+========= */
+
+function bindAuthUI() {
+  if (!authGate || !appRoot) return;
+
+  // Toggle login/signup/back from reset
+  authToggleModeBtn?.addEventListener("click", () => {
+    if (authBusy) return;
+    if (authView === AUTH_VIEW.LOGIN) return renderAuthView(AUTH_VIEW.SIGNUP);
+    if (authView === AUTH_VIEW.SIGNUP) return renderAuthView(AUTH_VIEW.LOGIN);
+    if (authView === AUTH_VIEW.RESET) return renderAuthView(AUTH_VIEW.LOGIN);
+  });
+
+  // Forgot password link
+  authForgotBtn?.addEventListener("click", () => {
+    if (authBusy) return;
+    renderAuthView(AUTH_VIEW.RESET);
+  });
+
+  // Show/hide password
+  authTogglePwBtn?.addEventListener("click", () => {
+    if (!authPassword) return;
+    const isPw = authPassword.type === "password";
+    authPassword.type = isPw ? "text" : "password";
+    authTogglePwBtn.setAttribute("aria-label", isPw ? "Hide password" : "Show password");
+  });
+
+  // Main CTA: Login / Create / Send reset
+  emailSignInBtn?.addEventListener("click", async () => {
+    if (!ensureAuthReady()) {
+      showAuthGate();
+      return setAuthError("Auth is not ready. Please verify Firebase Auth wiring in index.html and refresh.");
+    }
+
+    const email = (authEmail?.value || "").trim();
+    const password = authPassword?.value || "";
+
+    if (!email) return setAuthError("Please enter your email.");
+
+    const fns = window.firebaseAuthFns;
+
+    try {
+      setAuthError("");
+      if (authView === AUTH_VIEW.RESET) {
+        // Password reset (standard email link flow)
+        const { sendPasswordResetEmail } = fns;
+        if (!sendPasswordResetEmail) {
+          return setAuthError(
+            "sendPasswordResetEmail is not available. Add it to the Firebase Auth imports and window.firebaseAuthFns in index.html."
+          );
+        }
+
+        setAuthBusy(true, "Sending reset email…");
+
+        // Must be an absolute URL for the reset continue URL.
+        const continueUrl = `${location.origin}${document.baseURI.replace(location.origin, "").replace(/\/+$/, "")}`;
+
+        await sendPasswordResetEmail(window.auth, email, { url: continueUrl });
+
+        setAuthBusy(false);
+        setAuthError("");
+        // Success message (generic, safe)
+        authError?.classList.remove("hidden");
+        if (authError) authError.textContent = "If an account exists for this email, a reset link has been sent.";
+        return;
+      }
+
+      // Login / Signup
+      if (authView === AUTH_VIEW.LOGIN) {
+        if (!password) return setAuthError("Please enter your password.");
+        setAuthBusy(true, "Signing in…");
+        await fns.signInWithEmailAndPassword(window.auth, email, password);
+        setAuthBusy(false);
+        return; // UI swap happens via onAuthStateChanged
+      }
+
+      if (authView === AUTH_VIEW.SIGNUP) {
+        if (!password || password.length < 6) return setAuthError("Password must be at least 6 characters.");
+        setAuthBusy(true, "Creating account…");
+        await fns.createUserWithEmailAndPassword(window.auth, email, password);
+        setAuthBusy(false);
+        return; // UI swap via onAuthStateChanged
+      }
+    } catch (e) {
+      console.error(e);
+      setAuthBusy(false);
+      const msg = mapAuthError(e);
+      if (msg) setAuthError(msg);
+    }
+  });
+
+  // Google sign-in
+  googleSignInBtn?.addEventListener("click", async () => {
+    if (!ensureAuthReady()) {
+      showAuthGate();
+      return setAuthError("Auth is not ready. Please verify Firebase Auth wiring in index.html and refresh.");
+    }
+
+    const { signInWithPopup, GoogleAuthProvider } = window.firebaseAuthFns;
+
+    try {
+      setAuthError("");
+      setAuthBusy(true, "Opening Google sign-in…");
+      const provider = new GoogleAuthProvider();
+      await signInWithPopup(window.auth, provider);
+      setAuthBusy(false);
+      // UI swap via onAuthStateChanged
+    } catch (e) {
+      console.error(e);
+      setAuthBusy(false);
+      const msg = mapAuthError(e);
+      if (msg) setAuthError(msg);
+    }
+  });
+
+  // Logout (in header)
+  authLogoutBtn?.addEventListener("click", async () => {
+    if (!ensureAuthReady()) return;
+    const { signOut } = window.firebaseAuthFns;
+
+    try {
+      await signOut(window.auth);
+    } catch (e) {
+      console.error(e);
+      alert("Could not sign out. Please refresh.");
+    }
+  });
+
+  // Enter key submits main CTA (Login/Signup/Reset)
+  authEmail?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") emailSignInBtn?.click();
+  });
+  authPassword?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") emailSignInBtn?.click();
+  });
+}
+
+/* =========
    Auth gate init (loads Firestore only after login)
 ========= */
 
@@ -455,6 +604,7 @@ function initAuthGate() {
   }
 
   showAuthGate();
+  renderAuthView(AUTH_VIEW.LOGIN);
 
   if (!ensureAuthReady()) {
     setAuthError("Auth is not ready. Please verify Firebase Auth imports and window.firebaseAuthFns in index.html.");
@@ -465,15 +615,27 @@ function initAuthGate() {
 
   const { onAuthStateChanged } = window.firebaseAuthFns;
 
+  // Prevent partial states while Firebase resolves session
+  setAuthBusy(true, "Checking session…");
+
   onAuthStateChanged(window.auth, async (user) => {
-    if (user) {
-      showApp();
-      await loadIssuesFromFirestore();
-    } else {
+    try {
+      if (user) {
+        showApp();
+        setAuthBusy(false);
+        await loadIssuesFromFirestore();
+      } else {
+        showAuthGate();
+        setAuthBusy(false);
+        closeAllIssueMenus();
+        showOnlySection("common");
+        showListScreen();
+      }
+    } catch (e) {
+      console.error(e);
+      setAuthBusy(false);
       showAuthGate();
-      closeAllIssueMenus();
-      showOnlySection("common");
-      showListScreen();
+      setAuthError("Something went wrong loading the portal. Please refresh.");
     }
   });
 }
@@ -1589,7 +1751,7 @@ async function init() {
   showOnlySection("common");
   showListScreen();
 
-  // Auth gate (loads Firestore only after login if auth UI exists)
+  // Auth gate (loads Firestore only after login)
   initAuthGate();
 }
 
