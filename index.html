@@ -4,11 +4,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 
+  <!-- CRITICAL for GitHub Pages repo sites -->
   <base href="/troubleshooting-checklist/">
 
   <title>Troubleshooting Checklist Portal</title>
 
-  <link rel="stylesheet" href="style.css?v=32" />
+  <!-- Use absolute path under the repo -->
+  <link rel="stylesheet" href="style.css?v=33" />
 </head>
 
 <body>
@@ -35,11 +37,11 @@
 
     <div class="auth-divider"><span>or</span></div>
 
-    <label class="auth-label">Email</label>
-    <input id="authEmail" class="auth-input" type="email" placeholder="name@example.com" />
+    <label class="auth-label" for="authEmail">Email</label>
+    <input id="authEmail" class="auth-input" type="email" placeholder="name@example.com" autocomplete="email" />
 
-    <label class="auth-label">Password</label>
-    <input id="authPassword" class="auth-input" type="password" placeholder="Password" />
+    <label class="auth-label" for="authPassword">Password</label>
+    <input id="authPassword" class="auth-input" type="password" placeholder="Password" autocomplete="current-password" />
 
     <div class="auth-actions">
       <button id="emailSignInBtn" type="button" class="btn btn-secondary auth-btn">
@@ -71,9 +73,16 @@
       <p>Internal Support & Investigation Guide</p>
     </div>
 
-    <button id="themeToggle" class="theme-toggle" type="button">
-      ☀️
-    </button>
+    <div style="display:flex; gap:10px; align-items:center;">
+      <button id="themeToggle" class="theme-toggle" type="button" aria-label="Toggle theme">
+        ☀️
+      </button>
+
+      <!-- Logout (uses existing button styling; script.js will wire it) -->
+      <button id="logoutBtn" class="theme-toggle" type="button" aria-label="Sign out" title="Sign out">
+        ⎋
+      </button>
+    </div>
   </div>
 </header>
 
@@ -81,11 +90,15 @@
 
   <!-- =======================
        YOUR EXISTING PORTAL UI
-       (UNCHANGED)
+       IMPORTANT:
+       Paste your full existing portal markup here unchanged:
+       - Tabs row (Common/New/Help/Bin)
+       - Search row
+       - Common section (list + details)
+       - Bin section
+       - New Issues section
+       - Help section
   ======================== -->
-
-  <!-- KEEP ALL YOUR EXISTING SECTIONS EXACTLY AS THEY WERE -->
-  <!-- Common, Bin, New Issues, Help Sections remain unchanged -->
 
 </main>
 
@@ -95,11 +108,20 @@
 
 </div> <!-- End appRoot -->
 
+<!-- quick sanity check: if CSS didn’t load, body bg will still be white -->
+<script>
+  window.addEventListener("load", () => {
+    const bg = getComputedStyle(document.body).backgroundColor;
+    if (bg === "rgba(0, 0, 0, 0)" || bg === "rgb(255, 255, 255)") {
+      console.warn("CSS probably did not load. Check /troubleshooting-checklist/style.css");
+    }
+  });
+</script>
+
 <!-- ======================================================
      Firebase Setup (App + Firestore + Auth)
 ====================================================== -->
 <script type="module">
-
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
 
   import {
@@ -141,6 +163,7 @@
   window.db = db;
   window.auth = auth;
 
+  // Firestore helpers used by script.js
   window.firebaseFns = {
     collection,
     addDoc,
@@ -153,6 +176,7 @@
     orderBy
   };
 
+  // Auth helpers used by script.js
   window.firebaseAuth = {
     GoogleAuthProvider,
     signInWithPopup,
@@ -162,11 +186,11 @@
     signOut
   };
 
+  // Load script.js only after Firebase globals exist
   const s = document.createElement("script");
-  s.src = "/troubleshooting-checklist/script.js?v=32";
+  s.src = "/troubleshooting-checklist/script.js?v=33";
   s.defer = true;
   document.body.appendChild(s);
-
 </script>
 
 </body>

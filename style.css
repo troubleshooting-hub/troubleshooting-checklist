@@ -1,18 +1,24 @@
 /* =========================================================
    AUTH GATE (Login / Signup) — add-only styles
-   - Does NOT alter existing portal UI
+   - Matches main portal look (cards, pills, buttons, inputs)
    - Only affects #authGate / .auth-* elements
+   - Does NOT alter existing portal UI
 ========================================================= */
 
-#authGate {
-  min-height: calc(100vh - 140px); /* keeps header visible */
+#authGate.auth-gate{
+  min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 22px 16px 34px;
+
+  /* mimic portal background feel behind the auth card */
+  background:
+    radial-gradient(1200px 600px at 50% -40%, rgba(37,99,235,0.18), transparent 60%),
+    linear-gradient(180deg, var(--bg2), var(--bg));
 }
 
-.auth-card {
+.auth-card{
   width: min(520px, 100%);
   background: var(--panel);
   border: 1px solid var(--border);
@@ -21,97 +27,43 @@
   padding: 18px 18px 16px;
 }
 
-:root:not(.light-theme) .auth-card {
+:root:not(.light-theme) .auth-card{
   background: rgba(255,255,255,0.06);
   border: 1px solid rgba(255,255,255,0.10);
 }
 
-.auth-head {
+/* Brand header block */
+.auth-brand{
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
-  margin-bottom: 10px;
+  margin-bottom: 14px;
 }
 
-.auth-title {
+.auth-logo{
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  border-radius: 10px;
+}
+
+.auth-title{
   font-size: 18px;
   font-weight: 900;
   letter-spacing: -0.01em;
   margin: 0;
+  color: var(--text);
 }
 
-.auth-sub {
+.auth-sub{
   margin: 6px 0 0;
   color: var(--muted);
   font-size: 13px;
   line-height: 1.4;
 }
 
-.auth-tabs {
-  display: flex;
-  gap: 8px;
-  margin: 12px 0 14px;
-}
-
-.auth-tab {
-  flex: 1;
-  appearance: none;
-  border: 1px solid var(--btnBorder);
-  background: var(--btnBg);
-  color: var(--btnText);
-  padding: 9px 10px;
-  border-radius: 12px;
-  cursor: pointer;
-  font-weight: 800;
-  font-size: 12.5px;
-}
-
-.auth-tab.active {
-  background: rgba(37,99,235,0.12);
-  border-color: rgba(37,99,235,0.35);
-}
-
-:root:not(.light-theme) .auth-tab.active {
-  background: rgba(96,165,250,0.14);
-  border-color: rgba(96,165,250,0.30);
-}
-
-.auth-row {
-  display: grid;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.auth-row label {
-  font-weight: 800;
-  font-size: 13px;
-}
-
-.auth-actions {
-  display: grid;
-  gap: 10px;
-  margin-top: 14px;
-}
-
-.auth-divider {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 14px 0;
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.auth-divider::before,
-.auth-divider::after {
-  content: "";
-  height: 1px;
-  flex: 1;
-  background: var(--border);
-}
-
-.auth-error {
+/* Error banner */
+#authError.auth-error{
   border-radius: 14px;
   border: 1px solid rgba(239,68,68,0.22);
   background: rgba(239,68,68,0.08);
@@ -119,21 +71,112 @@
   color: var(--text);
   font-size: 13px;
   line-height: 1.35;
+  margin: 0 0 12px;
 }
 
-:root:not(.light-theme) .auth-error {
+:root:not(.light-theme) #authError.auth-error{
   background: rgba(239,68,68,0.10);
   border-color: rgba(239,68,68,0.20);
 }
 
-.auth-note {
-  margin-top: 10px;
+/* Inputs + labels */
+.auth-label{
+  display: block;
+  font-weight: 800;
+  margin: 10px 0 6px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.auth-input{
+  width: 100%;
+  border-radius: 14px;
+  border: 1px solid var(--border2);
+  padding: 12px 12px;
+  background: var(--panel);
+  color: var(--text);
+  outline: none;
+  font-family: inherit;
+  font-size: 13.5px;
+}
+
+:root:not(.light-theme) .auth-input{
+  background: rgba(255,255,255,0.06);
+  color: var(--text);
+  -webkit-text-fill-color: var(--text);
+  caret-color: var(--text);
+}
+
+.auth-input::placeholder{
+  color: rgba(100,116,139,0.85);
+}
+
+:root:not(.light-theme) .auth-input::placeholder{
+  color: rgba(229,231,235,0.55);
+}
+
+.auth-input:focus{
+  border-color: rgba(37,99,235,0.55);
+  box-shadow: 0 0 0 4px rgba(37,99,235,0.12);
+}
+
+/* Buttons */
+.auth-btn{
+  width: 100%;
+}
+
+/* Two-button row (Sign in / Register) */
+.auth-actions{
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+@media (max-width: 480px){
+  .auth-actions{
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Divider */
+.auth-divider{
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin: 14px 0 10px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.auth-divider::before,
+.auth-divider::after{
+  content: "";
+  height: 1px;
+  flex: 1;
+  background: var(--border);
+}
+
+.auth-divider span{
+  display: inline-flex;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(100,116,139,0.10);
+  border: 1px solid rgba(100,116,139,0.16);
+}
+
+/* Meta text */
+.auth-meta{
+  margin-top: 12px;
   color: var(--muted);
   font-size: 12.5px;
-  line-height: 1.4;
+  font-weight: 700;
+  text-align: center;
 }
 
 /* Keep your portal hidden until auth succeeds */
-#appRoot.hidden {
+#appRoot.hidden{
   display: none !important;
 }
