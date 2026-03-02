@@ -8,6 +8,9 @@
        * Delete moves issue to "Deleted / Bin" view (sets { deleted: true, deletedAt })
        * Restore brings it back (sets { deleted: false, deletedAt: null })
    - Works even if Bin tab/section is not yet in index.html (fails gracefully)
+   - AUTH GATE (Email/Password + Google):
+       * Shows login/register page until user is authenticated
+       * Loads Firestore ONLY after successful login
 ========================================================= */
 
 /* =========
@@ -185,14 +188,12 @@ const tabCommon = document.getElementById("tabCommon");
 const tabNew = document.getElementById("tabNew");
 const tabHelp = document.getElementById("tabHelp");
 
-// Optional (only if you add these in index.html later)
+// Optional
 const tabBin = document.getElementById("tabBin");
 
 const commonSection = document.getElementById("commonSection");
 const newSection = document.getElementById("newSection");
 const helpSection = document.getElementById("helpSection");
-
-// Optional (only if you add these in index.html later)
 const binSection = document.getElementById("binSection");
 
 const searchInput = document.getElementById("searchInput");
@@ -205,8 +206,8 @@ const issueList = document.getElementById("issueList");
 const issueDetailsPanel = document.getElementById("issueDetailsPanel");
 const issuesCountPill = document.getElementById("issuesCountPill");
 
-// Optional bin list UI (only if you add these in index.html later)
-const binList = document.getElementById("binList");
+// Bin list UI (support both old/new IDs)
+const binList = document.getElementById("binList") || document.getElementById("binIssueList");
 const binCountPill = document.getElementById("binCountPill");
 
 // Form
@@ -231,6 +232,62 @@ const helpCheckedInput = document.getElementById("helpCheckedInput");
 const helpAnalyzeBtn = document.getElementById("helpAnalyzeBtn");
 const helpClearBtn = document.getElementById("helpClearBtn");
 const helpResults = document.getElementById("helpResults");
+
+/* =========
+   Auth DOM (NEW)
+   NOTE: These IDs must exist in index.html for auth UI.
+   If they don't exist yet, everything fails gracefully.
+========= */
+
+const authGate = document.getElementById("authGate");   // login container
+const appRoot = document.getElementById("appRoot");     // wrap your existing portal (main content)
+
+const authTabLogin = document.getElementById("authTabLogin");
+const authTabSignup = document.getElementById("authTabSignup");
+
+const authEmail = document.getElementById("authEmail");
+const authPassword = document.getElementById("authPassword");
+const authSubmitBtn = document.getElementById("authSubmitBtn");
+const authGoogleBtn = document.getElementById("authGoogleBtn");
+const authLogoutBtn = document.getElementById("authLogoutBtn");
+const authError = document.getElementById("authError");
+
+/* =========
+   Auth UI helpers (NEW)
+========= */
+
+function setAuthError(msg = "") {
+  if (!authError) return;
+  if (!msg) {
+    authError.classList.add("hidden");
+    authError.textContent = "";
+    return;
+  }
+  authError.classList.remove("hidden");
+  authError.textContent = msg;
+}
+
+function showAuthGate() {
+  authGate?.classList.remove("hidden");
+  appRoot?.classList.add("hidden");
+}
+
+function showApp() {
+  authGate?.classList.add("hidden");
+  appRoot?.classList.remove("hidden");
+}
+
+function getAuthMode() {
+  return authTabSignup?.classList.contains("active") ? "signup" : "login";
+}
+
+function setAuthMode(mode) {
+  const isSignup = mode === "signup";
+  authTabLogin?.classList.toggle("active", !isSignup);
+  authTabSignup?.classList.toggle("active", isSignup);
+  if (authSubmitBtn) authSubmitBtn.textContent = isSignup ? "Create account" : "Sign in";
+  setAuthError("");
+}
 
 /* =========
    Duplicate suggestion UI
@@ -345,7 +402,6 @@ function ensureFirestoreReady() {
 }
 
 function splitActiveDeleted() {
-  // Treat anything with deleted === true as deleted
   issues = allIssues.filter(x => !x?.deleted);
   deletedIssues = allIssues.filter(x => !!x?.deleted);
 }
@@ -369,7 +425,7 @@ async function loadIssuesFromFirestore() {
   splitActiveDeleted();
 
   renderIssueList();
-  renderBinList();         // safe even if bin UI doesn't exist
+  renderBinList();
   renderDuplicateSuggestions();
 
   if (isInDetailScreen() && selectedIssueId) {
@@ -399,13 +455,122 @@ async function restoreIssueInFirestore(docId) {
   });
 }
 
-// Optional: permanently delete from DB (only from bin)
 async function hardDeleteIssueFromFirestore(docId) {
   if (!ensureFirestoreReady()) return;
 
   const { doc, deleteDoc } = window.firebaseFns;
   const ref = doc(window.db, "issues", docId);
   await deleteDoc(ref);
+}
+
+/* =========
+   Firebase Auth (NEW)
+   Requires index.html to set:
+   - window.auth
+   - window.firebaseAuthFns (onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword,
+     signInWithPopup, GoogleAuthProvider, signOut)
+========= */
+
+function ensureAuthReady() {
+  if (!window.auth || !window.firebaseAuthFns) {
+    // If auth UI doesn't exist, do nothing (portal will work open)
+    return false;
+  }
+  return true;
+}
+
+function bindAuthUI() {
+  if (!authGate || !appRoot) return;
+
+  authTabLogin?.addEventListener("click", () => setAuthMode("login"));
+  authTabSignup?.addEventListener("click", () => setAuthMode("signup"));
+
+  authSubmitBtn?.addEventListener("click", async () => {
+    if (!ensureAuthReady()) return;
+
+    const email = (authEmail?.value || "").trim();
+    const password = authPassword?.value || "";
+
+    if (!email) return setAuthError("Please enter your email.");
+    if (!password || password.length < 6) return setAuthError("Password must be at least 6 characters.");
+
+    setAuthError("");
+
+    const { signInWithEmailAndPassword, createUserWithEmailAndPassword } = window.firebaseAuthFns;
+
+    try {
+      if (getAuthMode() === "signup") {
+        await createUserWithEmailAndPassword(window.auth, email, password);
+      } else {
+        await signInWithEmailAndPassword(window.auth, email, password);
+      }
+    } catch (e) {
+      console.error(e);
+      setAuthError(e?.message || "Authentication failed. Please try again.");
+    }
+  });
+
+  authGoogleBtn?.addEventListener("click", async () => {
+    if (!ensureAuthReady()) return;
+
+    const { signInWithPopup, GoogleAuthProvider } = window.firebaseAuthFns;
+    setAuthError("");
+
+    try {
+      const provider = new GoogleAuthProvider();
+      await signInWithPopup(window.auth, provider);
+    } catch (e) {
+      console.error(e);
+      setAuthError(e?.message || "Google sign-in failed. Please try again.");
+    }
+  });
+
+  authLogoutBtn?.addEventListener("click", async () => {
+    if (!ensureAuthReady()) return;
+
+    const { signOut } = window.firebaseAuthFns;
+    try {
+      await signOut(window.auth);
+    } catch (e) {
+      console.error(e);
+      alert("Could not sign out. Please refresh.");
+    }
+  });
+}
+
+function initAuthGate() {
+  // If auth UI not present yet, skip gating and load data normally.
+  if (!authGate || !appRoot) {
+    // No auth UI in HTML; behave like earlier version
+    loadIssuesFromFirestore();
+    return;
+  }
+
+  if (!ensureAuthReady()) {
+    // Auth UI exists but Firebase Auth not wired yet
+    showAuthGate();
+    setAuthError("Auth is not ready. Please verify Firebase Auth imports in index.html and refresh.");
+    return;
+  }
+
+  bindAuthUI();
+  setAuthMode("login");
+
+  const { onAuthStateChanged } = window.firebaseAuthFns;
+
+  showAuthGate();
+
+  onAuthStateChanged(window.auth, async (user) => {
+    if (user) {
+      showApp();
+      await loadIssuesFromFirestore(); // load ONLY after login
+    } else {
+      showAuthGate();
+      closeAllIssueMenus();
+      showOnlySection("common");
+      showListScreen();
+    }
+  });
 }
 
 /* =========
@@ -430,13 +595,10 @@ function showOnlySection(which) {
   helpSection?.classList.toggle("hidden", !isHelp);
   binSection?.classList.toggle("hidden", !isBin);
 
-  // Search only for common list
   if (searchInput) searchInput.style.display = isCommon ? "" : "none";
 
-  // If leaving common, reset to list view
   if (!isCommon) showListScreen();
 
-  // Close any open menus on tab changes
   closeAllIssueMenus();
 }
 
@@ -567,7 +729,6 @@ function closeAllIssueMenus() {
 }
 
 function toggleIssueMenu({ issueId, anchorEl, mode }) {
-  // mode: "active" (Delete) or "bin" (Restore / Delete permanently)
   if (openMenuIssueId === issueId) {
     closeAllIssueMenus();
     return;
@@ -590,7 +751,6 @@ function toggleIssueMenu({ issueId, anchorEl, mode }) {
     `;
   }
 
-  // Append inside the li (issue-item); CSS positions menu absolute top/right
   const li = anchorEl.closest(".issue-item");
   li?.appendChild(menu);
 
@@ -622,7 +782,6 @@ async function deleteIssueFlow(issueId) {
 
   await softDeleteIssueInFirestore(issueId);
 
-  // If viewing this issue, go back to list
   if (selectedIssueId === issueId) showListScreen();
 
   await loadIssuesFromFirestore();
@@ -678,10 +837,8 @@ function renderIssueList() {
       </div>
     `;
 
-    // Row click opens details
     li.addEventListener("click", () => showDetailScreen(it.id));
 
-    // Dots click opens menu only (no navigation)
     const dots = li.querySelector(".issue-menu-btn");
     dots?.addEventListener("click", (e) => {
       e.preventDefault();
@@ -694,7 +851,6 @@ function renderIssueList() {
 }
 
 function renderBinList() {
-  // If you haven't added the Bin section in HTML yet, do nothing
   if (!binList || !binCountPill) return;
 
   closeAllIssueMenus();
@@ -723,7 +879,6 @@ function renderBinList() {
       </div>
     `;
 
-    // In bin, clicking row does NOT open detail (optional) — keep it simple.
     li.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -740,7 +895,6 @@ function renderBinList() {
   });
 }
 
-// Close menu when clicking elsewhere
 document.addEventListener("click", (e) => {
   const inMenu = e.target.closest?.(".issue-menu");
   const inBtn = e.target.closest?.(".issue-menu-btn");
@@ -964,7 +1118,6 @@ resetIssueBtn?.addEventListener("click", resetForm);
 saveIssueBtn?.addEventListener("click", async () => {
   if (!ensureFirestoreReady()) return;
 
-  // Ensure loaded before duplicate check
   if (!issues.length && !allIssues.length) await loadIssuesFromFirestore();
 
   const desc = (issueDescription?.value || "").trim();
@@ -1436,7 +1589,8 @@ async function init() {
   showOnlySection("common");
   showListScreen();
 
-  await loadIssuesFromFirestore();
+  // NEW: Auth gate (loads Firestore only after login if auth UI exists)
+  initAuthGate();
 }
 
 init();
