@@ -4,12 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 
-  <!-- CRITICAL for GitHub Pages repo sites -->
   <base href="/troubleshooting-checklist/">
-
   <title>Troubleshooting Checklist Portal</title>
 
-  <!-- Use absolute path under the repo -->
   <link rel="stylesheet" href="style.css?v=33" />
 </head>
 
@@ -19,42 +16,68 @@
      AUTH GATE (Login Page – Shows First)
 ====================================================== -->
 <div id="authGate" class="auth-gate">
-  <div class="auth-card">
+  <div class="auth-shell">
 
-    <div class="auth-brand">
-      <img class="auth-logo" src="assets/aquera-logo.png" alt="Aquera" />
-      <div>
-        <div class="auth-title">Troubleshooting Checklist Portal</div>
-        <div class="auth-sub">Sign in to continue</div>
+    <!-- LEFT BRAND PANEL -->
+    <section class="auth-left">
+      <div class="auth-left-inner">
+        <div class="auth-left-top">
+          <img class="auth-left-logo" src="assets/aquera-logo.png" alt="Aquera" />
+        </div>
+
+        <div class="auth-left-copy">
+          <div class="auth-left-title">Troubleshooting Checklist Portal</div>
+          <div class="auth-left-sub">Start your journey now with us</div>
+        </div>
+
+        <div class="auth-left-fade"></div>
       </div>
-    </div>
+    </section>
 
-    <div id="authError" class="auth-error hidden"></div>
+    <!-- RIGHT CARD -->
+    <section class="auth-right">
+      <div class="auth-card">
+        <div class="auth-card-head">
+          <div>
+            <div id="authCardTitle" class="auth-card-title">Login to your account</div>
+            <div class="auth-card-sub">Sign in to continue</div>
+          </div>
+        </div>
 
-    <button id="googleSignInBtn" type="button" class="btn btn-primary auth-btn">
-      Continue with Google
-    </button>
+        <div id="authError" class="auth-error hidden"></div>
 
-    <div class="auth-divider"><span>or</span></div>
+        <div class="auth-form">
+          <label class="auth-label" for="authEmail">Email</label>
+          <input id="authEmail" class="auth-input" type="email" placeholder="name@example.com" autocomplete="email" />
 
-    <label class="auth-label" for="authEmail">Email</label>
-    <input id="authEmail" class="auth-input" type="email" placeholder="name@example.com" autocomplete="email" />
+          <div class="auth-row-between">
+            <label class="auth-label" for="authPassword">Password</label>
+            <button id="authForgotBtn" type="button" class="auth-link-btn hidden">Forgot?</button>
+          </div>
+          <div class="auth-password-wrap">
+            <input id="authPassword" class="auth-input" type="password" placeholder="Enter your password" autocomplete="current-password" />
+            <button id="authTogglePwBtn" type="button" class="auth-eye" aria-label="Show password">👁</button>
+          </div>
 
-    <label class="auth-label" for="authPassword">Password</label>
-    <input id="authPassword" class="auth-input" type="password" placeholder="Password" autocomplete="current-password" />
+          <button id="emailSignInBtn" type="button" class="btn btn-primary auth-primary-btn">
+            Login now
+          </button>
 
-    <div class="auth-actions">
-      <button id="emailSignInBtn" type="button" class="btn btn-secondary auth-btn">
-        Sign in
-      </button>
-      <button id="emailRegisterBtn" type="button" class="btn btn-secondary auth-btn">
-        Register
-      </button>
-    </div>
+          <div class="auth-divider"><span>or</span></div>
 
-    <div class="auth-meta">
-      Internal use only
-    </div>
+          <button id="googleSignInBtn" type="button" class="btn btn-secondary auth-google-btn">
+            Continue with Google
+          </button>
+
+          <div class="auth-bottom">
+            <span id="authBottomText">Don’t have an account?</span>
+            <button id="authToggleModeBtn" type="button" class="auth-link-btn">Sign up</button>
+          </div>
+
+          <div class="auth-meta">Internal use only</div>
+        </div>
+      </div>
+    </section>
 
   </div>
 </div>
@@ -73,33 +96,20 @@
       <p>Internal Support & Investigation Guide</p>
     </div>
 
-    <div style="display:flex; gap:10px; align-items:center;">
-      <button id="themeToggle" class="theme-toggle" type="button" aria-label="Toggle theme">
-        ☀️
-      </button>
-
-      <!-- Logout (uses existing button styling; script.js will wire it) -->
-      <button id="logoutBtn" class="theme-toggle" type="button" aria-label="Sign out" title="Sign out">
-        ⎋
-      </button>
+    <div class="header-actions">
+      <button id="themeToggle" class="theme-toggle" type="button">☀️</button>
+      <button id="authLogoutBtn" class="btn btn-secondary small" type="button">Sign out</button>
     </div>
   </div>
 </header>
 
 <main class="page">
-
   <!-- =======================
        YOUR EXISTING PORTAL UI
-       IMPORTANT:
-       Paste your full existing portal markup here unchanged:
-       - Tabs row (Common/New/Help/Bin)
-       - Search row
-       - Common section (list + details)
-       - Bin section
-       - New Issues section
-       - Help section
+       (KEEP AS-IS)
   ======================== -->
 
+  <!-- paste your existing Common / Bin / New / Help sections here -->
 </main>
 
 <footer class="site-footer">
@@ -107,16 +117,6 @@
 </footer>
 
 </div> <!-- End appRoot -->
-
-<!-- quick sanity check: if CSS didn’t load, body bg will still be white -->
-<script>
-  window.addEventListener("load", () => {
-    const bg = getComputedStyle(document.body).backgroundColor;
-    if (bg === "rgba(0, 0, 0, 0)" || bg === "rgb(255, 255, 255)") {
-      console.warn("CSS probably did not load. Check /troubleshooting-checklist/style.css");
-    }
-  });
-</script>
 
 <!-- ======================================================
      Firebase Setup (App + Firestore + Auth)
@@ -163,7 +163,6 @@
   window.db = db;
   window.auth = auth;
 
-  // Firestore helpers used by script.js
   window.firebaseFns = {
     collection,
     addDoc,
@@ -176,8 +175,8 @@
     orderBy
   };
 
-  // Auth helpers used by script.js
-  window.firebaseAuth = {
+  // IMPORTANT: Script.js expects window.firebaseAuthFns (not firebaseAuth)
+  window.firebaseAuthFns = {
     GoogleAuthProvider,
     signInWithPopup,
     signInWithEmailAndPassword,
@@ -186,9 +185,9 @@
     signOut
   };
 
-  // Load script.js only after Firebase globals exist
+  // Load app logic after globals are ready
   const s = document.createElement("script");
-  s.src = "/troubleshooting-checklist/script.js?v=33";
+  s.src = "script.js?v=33";   // relative so it respects <base href>
   s.defer = true;
   document.body.appendChild(s);
 </script>
