@@ -7,7 +7,8 @@
   <base href="/troubleshooting-checklist/">
   <title>Troubleshooting Checklist Portal</title>
 
-  <link rel="stylesheet" href="style.css?v=33" />
+  <!-- Bump version to avoid GH Pages cache -->
+  <link rel="stylesheet" href="style.css?v=34" />
 </head>
 
 <body>
@@ -27,7 +28,6 @@
 
         <div class="auth-left-copy">
           <div class="auth-left-title">Troubleshooting Checklist Portal</div>
-          <!-- Requested: replace "Start your journey..." with troubleshooting messaging -->
           <div class="auth-left-sub">Search issues. Follow checklists. Resolve faster.</div>
         </div>
 
@@ -100,7 +100,6 @@
             <button id="authToggleModeBtn" type="button" class="auth-link-btn">Sign up</button>
           </div>
 
-          <!-- Requested: make this big/prominent via CSS -->
           <div class="auth-meta">Internal use only</div>
         </div>
 
@@ -147,6 +146,13 @@
 
     <div class="header-actions">
       <button id="themeToggle" class="theme-toggle" type="button">☀️</button>
+
+      <!-- NEW: User profile pill (first name) -->
+      <div id="userProfilePill" class="user-pill" title="Signed in user">
+        <span id="userProfileAvatar" class="user-avatar" aria-hidden="true">U</span>
+        <span id="userProfileName" class="user-name">User</span>
+      </div>
+
       <button id="authLogoutBtn" class="btn btn-secondary small" type="button">Sign out</button>
     </div>
   </div>
@@ -176,6 +182,7 @@
     getFirestore,
     collection,
     addDoc,
+    getDoc,
     getDocs,
     doc,
     setDoc,
@@ -183,6 +190,8 @@
     deleteDoc,
     serverTimestamp,
     query,
+    where,
+    limit,
     orderBy
   } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
 
@@ -195,7 +204,8 @@
     sendPasswordResetEmail,
     updateProfile,
     onAuthStateChanged,
-    signOut
+    signOut,
+    deleteUser
   } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js";
 
   const firebaseConfig = {
@@ -214,9 +224,11 @@
   window.db = db;
   window.auth = auth;
 
+  // Firestore helpers used by script.js
   window.firebaseFns = {
     collection,
     addDoc,
+    getDoc,
     getDocs,
     doc,
     setDoc,
@@ -224,10 +236,12 @@
     deleteDoc,
     serverTimestamp,
     query,
+    where,
+    limit,
     orderBy
   };
 
-  // Script.js expects window.firebaseAuthFns
+  // Auth helpers used by script.js
   window.firebaseAuthFns = {
     GoogleAuthProvider,
     signInWithPopup,
@@ -236,12 +250,13 @@
     sendPasswordResetEmail,
     updateProfile,
     onAuthStateChanged,
-    signOut
+    signOut,
+    deleteUser
   };
 
   // Load app logic after globals are ready
   const s = document.createElement("script");
-  s.src = "script.js?v=33";   // relative so it respects <base href>
+  s.src = "script.js?v=34"; // relative so it respects <base href>
   s.defer = true;
   document.body.appendChild(s);
 </script>
