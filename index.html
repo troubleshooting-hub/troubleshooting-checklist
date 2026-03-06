@@ -7,14 +7,13 @@
   <base href="/troubleshooting-checklist/">
   <title>Troubleshooting Checklist Portal</title>
 
-  <!-- Bump version to avoid GH Pages cache -->
-  <link rel="stylesheet" href="style.css?v=34" />
+  <link rel="stylesheet" href="style.css?v=35" />
 </head>
 
 <body>
 
 <!-- ======================================================
-     AUTH GATE (Login / Signup / Reset) — Shows First
+     AUTH GATE (Login / Signup / Reset)
 ====================================================== -->
 <div id="authGate" class="auth-gate">
   <div class="auth-shell">
@@ -23,7 +22,9 @@
     <section class="auth-left">
       <div class="auth-left-inner">
         <div class="auth-left-top">
-          <img class="auth-left-logo" src="assets/aquera-logo.png" alt="Aquera" />
+          <div class="auth-left-logo-badge">
+            <img class="auth-left-logo" src="assets/aquera-logo.png" alt="Aquera" />
+          </div>
         </div>
 
         <div class="auth-left-copy">
@@ -31,15 +32,15 @@
           <div class="auth-left-sub">Search issues. Follow checklists. Resolve faster.</div>
         </div>
 
-        <div class="auth-left-fade"></div>
+        <div class="auth-left-glow"></div>
       </div>
     </section>
 
-    <!-- RIGHT CARD -->
+    <!-- RIGHT AUTH CARD -->
     <section class="auth-right">
       <div class="auth-card">
 
-        <!-- Loading overlay so user never sees partial UI -->
+        <!-- Loading overlay -->
         <div id="authLoading" class="auth-loading hidden" aria-live="polite">
           <div class="auth-loading-inner">
             <div class="auth-spinner" aria-hidden="true"></div>
@@ -47,77 +48,126 @@
           </div>
         </div>
 
-        <div class="auth-card-head">
-          <div>
-            <div id="authCardTitle" class="auth-card-title">Login to your account</div>
-            <div id="authCardSub" class="auth-card-sub">Sign in to continue</div>
-          </div>
-        </div>
-
-        <div id="authError" class="auth-error hidden"></div>
-
-        <!-- ======================
+        <!-- =========================
              LOGIN / SIGNUP VIEW
-        ======================= -->
-        <div id="authFormView" class="auth-form">
+        ========================== -->
+        <div id="authFormView" class="auth-view">
+          <div class="auth-card-head">
+            <h2 id="authCardTitle" class="auth-card-title">Sign In</h2>
+            <p id="authCardSub" class="auth-card-sub">Enter your credentials to continue</p>
+          </div>
+
+          <div id="authError" class="auth-error hidden"></div>
 
           <!-- Signup-only fields -->
-          <div id="authNameRow" class="auth-signup-only hidden">
-            <label class="auth-label" for="authFirstName">First name</label>
-            <input id="authFirstName" class="auth-input" type="text" placeholder="First name" autocomplete="given-name" />
+          <div id="authNameRow" class="auth-name-grid hidden">
+            <div class="auth-field">
+              <label class="auth-label" for="authFirstName">First Name</label>
+              <input
+                id="authFirstName"
+                class="auth-input"
+                type="text"
+                placeholder="First name"
+                autocomplete="given-name"
+              />
+            </div>
 
-            <label class="auth-label" for="authLastName" style="margin-top:10px;">Last name</label>
-            <input id="authLastName" class="auth-input" type="text" placeholder="Last name" autocomplete="family-name" />
+            <div class="auth-field">
+              <label class="auth-label" for="authLastName">Last Name</label>
+              <input
+                id="authLastName"
+                class="auth-input"
+                type="text"
+                placeholder="Last name"
+                autocomplete="family-name"
+              />
+            </div>
           </div>
 
-          <label class="auth-label" for="authEmail">Email</label>
-          <input id="authEmail" class="auth-input" type="email" placeholder="name@example.com" autocomplete="email" />
+          <div class="auth-field">
+            <label class="auth-label" for="authEmail">Email</label>
+            <input
+              id="authEmail"
+              class="auth-input"
+              type="email"
+              placeholder="name@example.com"
+              autocomplete="email"
+            />
+          </div>
 
-          <div id="authPwRow" class="auth-pw-row">
+          <div id="authPwRow" class="auth-field">
             <div class="auth-row-between">
               <label class="auth-label" for="authPassword">Password</label>
-              <button id="authForgotBtn" type="button" class="auth-link-btn">Forgot?</button>
+              <button id="authForgotBtn" type="button" class="auth-link-btn">Forgot password?</button>
             </div>
 
             <div class="auth-password-wrap">
-              <input id="authPassword" class="auth-input" type="password" placeholder="Enter your password" autocomplete="current-password" />
-              <button id="authTogglePwBtn" type="button" class="auth-eye" aria-label="Show password">👁</button>
+              <input
+                id="authPassword"
+                class="auth-input auth-input-password"
+                type="password"
+                placeholder="Password"
+                autocomplete="current-password"
+              />
+              <button
+                id="authTogglePwBtn"
+                type="button"
+                class="auth-eye"
+                aria-label="Show password"
+              >
+                👁
+              </button>
             </div>
           </div>
 
-          <button id="authPrimaryBtn" type="button" class="btn btn-primary auth-primary-btn">
-            Login now
+          <button id="authPrimaryBtn" type="button" class="auth-main-btn">
+            Sign In
           </button>
 
-          <div class="auth-divider"><span>or</span></div>
+          <div class="auth-divider">
+            <span>or</span>
+          </div>
 
-          <button id="googleSignInBtn" type="button" class="btn btn-secondary auth-google-btn">
-            Continue with Google
+          <button id="googleSignInBtn" type="button" class="auth-google-btn">
+            <span class="auth-google-icon">G</span>
+            <span>Continue with Google</span>
           </button>
 
           <div class="auth-bottom">
-            <span id="authBottomText">Don’t have an account?</span>
-            <button id="authToggleModeBtn" type="button" class="auth-link-btn">Sign up</button>
+            <span id="authBottomText">Don't have an account?</span>
+            <button id="authToggleModeBtn" type="button" class="auth-link-btn">Create one</button>
           </div>
 
           <div class="auth-meta">Internal use only</div>
         </div>
 
-        <!-- ======================
+        <!-- =========================
              RESET PASSWORD VIEW
-        ======================= -->
-        <div id="authResetView" class="auth-form hidden">
-          <div class="auth-card-title" style="margin-bottom:6px;">Reset your password</div>
-          <div class="auth-card-sub" style="margin-bottom:14px;">We’ll email you a reset link.</div>
+        ========================== -->
+        <div id="authResetView" class="auth-view hidden">
+          <div class="auth-card-head">
+            <h2 class="auth-card-title">Reset Password</h2>
+            <p class="auth-card-sub">Enter your email to receive a reset link</p>
+          </div>
 
-          <label class="auth-label" for="authResetEmail">Email</label>
-          <input id="authResetEmail" class="auth-input" type="email" placeholder="name@example.com" autocomplete="email" />
+          <div id="authResetError" class="auth-error hidden"></div>
 
-          <button id="authResetSendBtn" type="button" class="btn btn-primary auth-primary-btn">
+          <div class="auth-field">
+            <label class="auth-label" for="authResetEmail">Email</label>
+            <input
+              id="authResetEmail"
+              class="auth-input"
+              type="email"
+              placeholder="name@example.com"
+              autocomplete="email"
+            />
+          </div>
+
+          <button id="authResetSendBtn" type="button" class="auth-main-btn">
             Send reset email
           </button>
 
-          <div class="auth-bottom" style="margin-top:12px;">
+          <div class="auth-bottom">
             <button id="authResetBackBtn" type="button" class="auth-link-btn">Back to login</button>
           </div>
 
@@ -147,7 +197,6 @@
     <div class="header-actions">
       <button id="themeToggle" class="theme-toggle" type="button">☀️</button>
 
-      <!-- NEW: User profile pill (first name) -->
       <div id="userProfilePill" class="user-pill" title="Signed in user">
         <span id="userProfileAvatar" class="user-avatar" aria-hidden="true">U</span>
         <span id="userProfileName" class="user-name">User</span>
@@ -160,8 +209,9 @@
 
 <main class="page">
   <!-- IMPORTANT:
-       Your FULL portal markup must be here (tabs + Common/Bin/New/Help sections).
-       If this stays as a placeholder, you will see a “blank” portal after login. -->
+       Your FULL portal markup must stay here exactly as before.
+       Do not replace your actual Common / Bin / New / Help sections with a placeholder.
+  -->
 
   <!-- paste your existing Common / Bin / New / Help sections here -->
 </main>
@@ -170,7 +220,7 @@
   Internal Use Only | Troubleshooting Portal
 </footer>
 
-</div> <!-- End appRoot -->
+</div>
 
 <!-- ======================================================
      Firebase Setup (App + Firestore + Auth)
@@ -224,7 +274,6 @@
   window.db = db;
   window.auth = auth;
 
-  // Firestore helpers used by script.js
   window.firebaseFns = {
     collection,
     addDoc,
@@ -241,7 +290,6 @@
     orderBy
   };
 
-  // Auth helpers used by script.js
   window.firebaseAuthFns = {
     GoogleAuthProvider,
     signInWithPopup,
@@ -254,9 +302,8 @@
     deleteUser
   };
 
-  // Load app logic after globals are ready
   const s = document.createElement("script");
-  s.src = "script.js?v=34"; // relative so it respects <base href>
+  s.src = "script.js?v=35";
   s.defer = true;
   document.body.appendChild(s);
 </script>

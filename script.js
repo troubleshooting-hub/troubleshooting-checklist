@@ -1,24 +1,10 @@
 /* =========================================================
    Troubleshooting Checklist Portal — AUTH + USER PROFILES
-   Implements:
-   1) Signup view fields: First/Last/Email/Password + inline field errors
-   2) Password signup:
-      - Firestore uniqueness check on fullNameKey BEFORE auth creation
-      - Create users/{uid} profile doc
-      - updateProfile(displayName)
-   3) Google sign-in:
-      - Ensure users/{uid} exists
-      - Enforce fullNameKey uniqueness; on collision -> sign out + block
-   4) Header: show firstName in top-right (#userProfileName if present)
-   5) Stable auth gate <-> app transition + loading overlay
-
-   IMPORTANT: Your index.html Firebase module MUST expose these Firestore fns:
-   - getDoc, where, limit
-   Optional but recommended for stronger uniqueness:
-   - runTransaction
-
-   i.e. add to imports and window.firebaseFns:
-     getDoc, where, limit, runTransaction
+   FIXED:
+   - Signup no longer does Firestore uniqueness check before auth
+   - Creates auth user first, then checks/acquires name lock
+   - Prevents "Could not verify name uniqueness" under auth-required rules
+   - Keeps Google sign-in, reset password, profile doc creation, and header name
 ========================================================= */
 
 /* =========
@@ -46,7 +32,6 @@ function normalizeFullName(firstName = "", lastName = "") {
 
 function looksLikeEmail(email = "") {
   const e = String(email || "").trim();
-  // simple, safe email shape check
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
 }
 
@@ -67,15 +52,7 @@ function initialsFromName(first = "", last = "") {
 }
 
 /* =========
-   DOM — Portal (existing)
-========= */
-
-// Tabs / sections etc are already in your current script;
-// keep your portal logic below as-is.
-// (I’m only adding auth + profile parts + minimal hooks.)
-
-/* =========
-   Auth DOM (from your provided index.html)
+   Auth DOM
 ========= */
 
 const authGate = document.getElementById("authGate");
@@ -112,8 +89,8 @@ const authResetBackBtn = document.getElementById("authResetBackBtn");
 
 const authLogoutBtn = document.getElementById("authLogoutBtn");
 
-/* Header profile name (add in HTML if you want the pill) */
 const userProfileNameEl = document.getElementById("userProfileName");
+const userProfileAvatarEl = document.getElementById("userProfileAvatar");
 
 /* =========
    Firebase readiness
@@ -128,7 +105,7 @@ function ensureFirestoreReady() {
 }
 
 /* =========
-   Inline field errors (no alert)
+   Inline field errors
 ========= */
 
 function ensureInlineErrorEl(inputEl) {
@@ -141,7 +118,6 @@ function ensureInlineErrorEl(inputEl) {
   const div = document.createElement("div");
   div.id = `${id}Error`;
   div.className = "auth-inline-error hidden";
-  // insert right after input
   inputEl.insertAdjacentElement("afterend", div);
   return div;
 }
@@ -196,7 +172,9 @@ function setAuthBusy(isBusy, label = "Loading…") {
     authResetBackBtn
   ]
     .filter(Boolean)
-    .forEach((b) => (b.disabled = authBusy));
+    .forEach((b) => {
+      b.disabled = authBusy;
+    });
 
   if (authLoading) {
     if (authBusy) {
@@ -237,20 +215,13 @@ function renderAuthView(nextView) {
   setAuthError("");
   clearAllFieldErrors();
 
-  // Toggle form blocks
   if (authFormView) authFormView.classList.toggle("hidden", authView === AUTH_VIEW.RESET);
   if (authResetView) authResetView.classList.toggle("hidden", authView !== AUTH_VIEW.RESET);
 
-  // Signup-only name fields
   authNameRow?.classList.toggle("hidden", authView !== AUTH_VIEW.SIGNUP);
-
-  // Forgot link only on login
   authForgotBtn?.classList.toggle("hidden", authView !== AUTH_VIEW.LOGIN);
-
-  // Password eye only when password input visible (login/signup)
   authTogglePwBtn?.classList.toggle("hidden", authView === AUTH_VIEW.RESET);
 
-  // Titles + copy
   if (authView === AUTH_VIEW.LOGIN) {
     if (authCardTitle) authCardTitle.textContent = "Login to your account";
     if (authCardSub) authCardSub.textContent = "Sign in to continue";
@@ -268,7 +239,6 @@ function renderAuthView(nextView) {
   }
 
   if (authView === AUTH_VIEW.RESET) {
-    // Reset view has its own title/sub in your HTML
     if (authCardTitle) authCardTitle.textContent = "Reset your password";
     if (authCardSub) authCardSub.textContent = "We’ll email you a reset link.";
   }
@@ -315,7 +285,7 @@ async function getUserDoc(uid) {
 }
 
 async function createOrUpdateUserDoc(uid, data) {
-  const need = requireFirestoreFns(["doc", "setDoc", "serverTimestamp"]);
+  const need = requireFirestoreFns(["doc", "setDoc"]);
   if (!need.ok) throw new Error(`Missing Firestore fns: ${need.missing.join(", ")}`);
 
   const { doc, setDoc } = window.firebaseFns;
@@ -334,26 +304,18 @@ async function checkFullNameKeyCollision(fullNameKey, exceptUid = "") {
 
   if (snap.empty) return false;
 
-  // If the only hit is the same uid, it's not a collision
   const hit = snap.docs[0];
   if (exceptUid && hit.id === exceptUid) return false;
 
   return true;
 }
 
-/**
- * Recommended: name locks to reduce race conditions
- * userNameLocks/{fullNameKey} with { uid, createdAt }
- */
 async function tryAcquireNameLock(fullNameKey, uid) {
   const hasTx = !!window.firebaseFns?.runTransaction;
-  const hasGetDoc = !!window.firebaseFns?.getDoc;
-  const hasSetDoc = !!window.firebaseFns?.setDoc;
   const hasDoc = !!window.firebaseFns?.doc;
   const hasServerTimestamp = !!window.firebaseFns?.serverTimestamp;
 
-  if (!(hasTx && hasGetDoc && hasSetDoc && hasDoc && hasServerTimestamp)) {
-    // Fall back to simple pre-check (lower safety)
+  if (!(hasTx && hasDoc && hasServerTimestamp)) {
     const collision = await checkFullNameKeyCollision(fullNameKey, uid);
     if (collision) return { ok: false, reason: "collision" };
     return { ok: true, reason: "no-lock-fallback" };
@@ -364,10 +326,10 @@ async function tryAcquireNameLock(fullNameKey, uid) {
 
   const res = await runTransaction(window.db, async (tx) => {
     const lockSnap = await tx.get(lockRef);
+
     if (lockSnap.exists()) {
       const lockUid = lockSnap.data()?.uid || "";
       if (lockUid && lockUid !== uid) return { ok: false, reason: "collision" };
-      // If already locked by same uid, treat as ok
       return { ok: true, reason: "already-locked" };
     }
 
@@ -379,7 +341,7 @@ async function tryAcquireNameLock(fullNameKey, uid) {
 }
 
 /* =========
-   Ensure profile exists (Google or post-login)
+   Ensure profile exists
 ========= */
 
 function splitName(displayName = "") {
@@ -395,38 +357,32 @@ function splitName(displayName = "") {
 async function ensureUserProfileForAuthUser(user, { providerHint = "" } = {}) {
   if (!user?.uid) return;
 
-  // If profile already exists -> done
   try {
     const snap = await getUserDoc(user.uid);
     if (snap.exists()) return;
   } catch (e) {
-    // If getDoc missing, surface clean error
     console.error(e);
     setAuthError("Firestore user profile check failed. Ensure getDoc is exported in index.html.");
     throw e;
   }
 
-  // Need to create profile
   const authProvider = providerHint || (user?.providerData?.[0]?.providerId === "password" ? "password" : "google");
 
   let firstName = "";
   let lastName = "";
 
-  // From displayName if possible
   if (user.displayName) {
     const parts = splitName(user.displayName);
     firstName = parts.firstName;
     lastName = parts.lastName;
   }
 
-  // If Google sometimes has no displayName, fall back to email prefix
   if (!firstName) firstName = firstNameFallbackFromAuth(user);
 
   const norm = normalizeFullName(firstName, lastName);
   const collision = await checkFullNameKeyCollision(norm.fullNameKey, user.uid);
 
   if (collision) {
-    // Requirement: block + sign out immediately
     setAuthError("Your name already exists in the system. Please contact admin.");
     try {
       await window.firebaseAuthFns.signOut(window.auth);
@@ -459,7 +415,6 @@ async function updateHeaderUserName(user) {
 
   let first = "";
 
-  // Prefer Firestore
   try {
     const snap = await getUserDoc(user.uid);
     if (snap.exists()) {
@@ -469,33 +424,27 @@ async function updateHeaderUserName(user) {
 
       if (first) {
         const initials = initialsFromName(first, last);
-        userProfileNameEl.innerHTML = `
-          <span class="user-pill">
-            <span class="user-initials" aria-hidden="true">${escapeHtml(initials)}</span>
-            <span class="user-first">${escapeHtml(first)}</span>
-          </span>
-        `;
+
+        if (userProfileAvatarEl) {
+          userProfileAvatarEl.textContent = initials;
+        }
+        userProfileNameEl.textContent = first;
         return;
       }
     }
-  } catch {
-    // ignore, use fallback
-  }
+  } catch {}
 
-  // Fallback: Auth displayName
   first = firstNameFallbackFromAuth(user);
-
   const initials = initialsFromName(first, "");
-  userProfileNameEl.innerHTML = `
-    <span class="user-pill">
-      <span class="user-initials" aria-hidden="true">${escapeHtml(initials)}</span>
-      <span class="user-first">${escapeHtml(first)}</span>
-    </span>
-  `;
+
+  if (userProfileAvatarEl) {
+    userProfileAvatarEl.textContent = initials;
+  }
+  userProfileNameEl.textContent = first;
 }
 
 /* =========
-   Signup validation
+   Validation
 ========= */
 
 function validateSignupFields() {
@@ -543,6 +492,7 @@ function validateLoginFields() {
     setFieldError(authEmail, "Please enter a valid email address.");
     ok = false;
   }
+
   if (!pw) {
     setFieldError(authPassword, "Please enter your password.");
     ok = false;
@@ -565,13 +515,9 @@ async function handlePasswordSignup() {
     return;
   }
 
-  const need = requireFirestoreFns(["where", "limit", "getDoc"]);
+  const need = requireFirestoreFns(["getDoc", "where", "limit"]);
   if (!need.ok) {
-    setAuthError(
-      `Missing Firestore exports in index.html: ${need.missing.join(
-        ", "
-      )}. Add them to Firebase imports and window.firebaseFns.`
-    );
+    setAuthError(`Missing Firestore exports in index.html: ${need.missing.join(", ")}`);
     return;
   }
 
@@ -579,65 +525,46 @@ async function handlePasswordSignup() {
   if (!ok) return;
 
   const norm = normalizeFullName(first, last);
+  let createdUser = null;
 
-  // Pre-check before creating auth user (requirement)
-  setAuthBusy(true, "Checking name availability…");
   try {
-    const collision = await checkFullNameKeyCollision(norm.fullNameKey);
-    if (collision) {
-      setAuthBusy(false);
+    // Create auth user first so Firestore reads work under request.auth != null rules
+    setAuthBusy(true, "Creating account…");
+    const userCred = await window.firebaseAuthFns.createUserWithEmailAndPassword(window.auth, email, pw);
+    createdUser = userCred.user;
+
+    // After auth, verify/acquire uniqueness
+    setAuthBusy(true, "Finalizing profile…");
+    const lockRes = await tryAcquireNameLock(norm.fullNameKey, createdUser.uid);
+
+    if (!lockRes.ok) {
       setFieldError(
         authLastName,
         "An account with this name already exists. Please contact admin or use a different name."
       );
-      return;
-    }
-  } catch (e) {
-    console.error(e);
-    setAuthBusy(false);
-    setAuthError("Could not verify name uniqueness. Please check Firestore exports and try again.");
-    return;
-  }
 
-  // Create auth user
-  let userCred = null;
-  try {
-    setAuthBusy(true, "Creating account…");
-    userCred = await window.firebaseAuthFns.createUserWithEmailAndPassword(window.auth, email, pw);
-
-    const user = userCred.user;
-
-    // Acquire lock (best effort; blocks race when available)
-    const lockRes = await tryAcquireNameLock(norm.fullNameKey, user.uid);
-    if (!lockRes.ok) {
-      // Collision after auth user created -> best effort cleanup
-      setAuthBusy(false);
-      setAuthError("An account with this name already exists. Please contact admin.");
-
-      // best-effort: sign out so portal access is blocked
       try {
         await window.firebaseAuthFns.signOut(window.auth);
       } catch {}
 
-      // optional best-effort delete (only if your index.html exports deleteUser)
       if (window.firebaseAuthFns.deleteUser) {
         try {
-          await window.firebaseAuthFns.deleteUser(user);
+          await window.firebaseAuthFns.deleteUser(createdUser);
         } catch {}
       }
 
       showAuthGate();
       renderAuthView(AUTH_VIEW.SIGNUP);
+      setAuthBusy(false);
       return;
     }
 
-    // Update Auth displayName
-    const displayName = norm.fullName;
-    await window.firebaseAuthFns.updateProfile(user, { displayName });
+    await window.firebaseAuthFns.updateProfile(createdUser, {
+      displayName: norm.fullName
+    });
 
-    // Create user profile doc
     const profileDoc = {
-      uid: user.uid,
+      uid: createdUser.uid,
       firstName: first,
       lastName: last,
       fullName: norm.fullName,
@@ -647,16 +574,29 @@ async function handlePasswordSignup() {
       authProvider: "password"
     };
 
-    await createOrUpdateUserDoc(user.uid, profileDoc);
+    await createOrUpdateUserDoc(createdUser.uid, profileDoc);
 
     setAuthBusy(false);
-    // UI transition will happen in onAuthStateChanged
+    // onAuthStateChanged will handle the UI transition
   } catch (e) {
     console.error(e);
     setAuthBusy(false);
 
+    if (createdUser) {
+      try {
+        await window.firebaseAuthFns.signOut(window.auth);
+      } catch {}
+
+      if (window.firebaseAuthFns.deleteUser) {
+        try {
+          await window.firebaseAuthFns.deleteUser(createdUser);
+        } catch {}
+      }
+    }
+
     const msg = mapAuthError(e);
     if (msg) setAuthError(msg);
+    else setAuthError("Signup failed. Please try again.");
   }
 }
 
@@ -694,7 +634,6 @@ async function handleGoogleSignIn() {
     const provider = new window.firebaseAuthFns.GoogleAuthProvider();
     await window.firebaseAuthFns.signInWithPopup(window.auth, provider);
     setAuthBusy(false);
-    // onAuthStateChanged will run ensureUserProfileForAuthUser()
   } catch (e) {
     console.error(e);
     setAuthBusy(false);
@@ -720,14 +659,12 @@ async function handlePasswordReset() {
   try {
     setAuthBusy(true, "Sending reset email…");
 
-    // Continue URL should land back on your GitHub Pages base
     const basePath = document.baseURI.replace(location.origin, "").replace(/\/+$/, "");
     const continueUrl = `${location.origin}${basePath}`;
 
     await window.firebaseAuthFns.sendPasswordResetEmail(window.auth, email, { url: continueUrl });
 
     setAuthBusy(false);
-    // Safe generic message
     setAuthError("If an account exists for this email, a reset link has been sent.");
     authError?.classList.remove("hidden");
   } catch (e) {
@@ -743,7 +680,6 @@ async function handlePasswordReset() {
 ========= */
 
 function bindAuthUI() {
-  // Toggle login <-> signup
   authToggleModeBtn?.addEventListener("click", () => {
     if (authBusy) return;
 
@@ -751,22 +687,20 @@ function bindAuthUI() {
     else if (authView === AUTH_VIEW.SIGNUP) renderAuthView(AUTH_VIEW.LOGIN);
   });
 
-  // Forgot -> reset view
   authForgotBtn?.addEventListener("click", () => {
     if (authBusy) return;
 
-    // copy email if present
-    if (authResetEmail && authEmail) authResetEmail.value = String(authEmail.value || "").trim();
+    if (authResetEmail && authEmail) {
+      authResetEmail.value = String(authEmail.value || "").trim();
+    }
     renderAuthView(AUTH_VIEW.RESET);
   });
 
-  // Reset back
   authResetBackBtn?.addEventListener("click", () => {
     if (authBusy) return;
     renderAuthView(AUTH_VIEW.LOGIN);
   });
 
-  // Password toggle
   authTogglePwBtn?.addEventListener("click", () => {
     if (!authPassword) return;
     const isPw = authPassword.type === "password";
@@ -774,7 +708,6 @@ function bindAuthUI() {
     authTogglePwBtn.setAttribute("aria-label", isPw ? "Hide password" : "Show password");
   });
 
-  // Primary action (login or create)
   authPrimaryBtn?.addEventListener("click", async () => {
     if (authBusy) return;
 
@@ -782,45 +715,82 @@ function bindAuthUI() {
     if (authView === AUTH_VIEW.SIGNUP) return handlePasswordSignup();
   });
 
-  // Google (works in login or signup views)
   googleSignInBtn?.addEventListener("click", async () => {
     if (authBusy) return;
     await handleGoogleSignIn();
   });
 
-  // Reset send
   authResetSendBtn?.addEventListener("click", async () => {
     if (authBusy) return;
     await handlePasswordReset();
   });
 
-  // Enter key submits appropriate CTA
   authEmail?.addEventListener("keydown", (e) => {
     if (e.key === "Enter") authPrimaryBtn?.click();
   });
+
   authPassword?.addEventListener("keydown", (e) => {
     if (e.key === "Enter") authPrimaryBtn?.click();
   });
+
   authFirstName?.addEventListener("keydown", (e) => {
     if (e.key === "Enter") authPrimaryBtn?.click();
   });
+
   authLastName?.addEventListener("keydown", (e) => {
     if (e.key === "Enter") authPrimaryBtn?.click();
   });
+
   authResetEmail?.addEventListener("keydown", (e) => {
     if (e.key === "Enter") authResetSendBtn?.click();
   });
 
-  // Logout
   authLogoutBtn?.addEventListener("click", async () => {
     if (!ensureAuthReady()) return;
     try {
       await window.firebaseAuthFns.signOut(window.auth);
     } catch (e) {
       console.error(e);
-      // no alerts; show banner on gate after sign-out attempt
     }
   });
+}
+
+/* =========
+   Issues loader
+========= */
+
+async function loadIssuesFromFirestore() {
+  if (!ensureFirestoreReady()) return;
+
+  const need = requireFirestoreFns(["collection", "getDocs", "query", "orderBy"]);
+  if (!need.ok) {
+    console.warn("Missing Firestore functions for issues loader:", need.missing.join(", "));
+    return;
+  }
+
+  const { collection, getDocs, query, orderBy } = window.firebaseFns;
+  const colRef = collection(window.db, "issues");
+
+  try {
+    const q = query(colRef, orderBy("createdAt", "desc"));
+    const snap = await getDocs(q);
+    window.allIssues = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  } catch (e) {
+    console.warn("OrderBy(createdAt) failed, falling back to unsorted getDocs()", e);
+    const snap = await getDocs(colRef);
+    window.allIssues = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  }
+
+  // If your main portal script defines these, they will run.
+  if (typeof splitActiveDeleted === "function") splitActiveDeleted();
+  if (typeof renderIssueList === "function") renderIssueList();
+  if (typeof renderBinList === "function") renderBinList();
+  if (typeof renderDuplicateSuggestions === "function") renderDuplicateSuggestions();
+  if (typeof isInDetailScreen === "function" && typeof renderSelectedIssueDetails === "function") {
+    if (isInDetailScreen() && window.selectedIssueId) {
+      renderSelectedIssueDetails();
+    }
+  }
 }
 
 /* =========
@@ -829,7 +799,6 @@ function bindAuthUI() {
 
 async function initAuthGate({ onAuthed } = {}) {
   if (!authGate || !appRoot) {
-    // No auth gate present -> run app normally
     if (typeof onAuthed === "function") await onAuthed(window.auth?.currentUser || null);
     return;
   }
@@ -853,30 +822,26 @@ async function initAuthGate({ onAuthed } = {}) {
       if (!user) {
         showAuthGate();
         setAuthBusy(false);
-        // keep login view by default
         renderAuthView(AUTH_VIEW.LOGIN);
         return;
       }
 
-      // Ensure Firestore profile exists (Google users especially)
       if (ensureFirestoreReady()) {
-        await ensureUserProfileForAuthUser(user, { providerHint: "google" }).catch(() => {
-          // ensureUserProfileForAuthUser handles sign-out + message on collision
-        });
+        await ensureUserProfileForAuthUser(user, { providerHint: "google" }).catch(() => {});
       }
 
-      // Update header pill
       if (ensureFirestoreReady()) {
         await updateHeaderUserName(user);
       } else if (userProfileNameEl) {
-        const first = firstNameFallbackFromAuth(user);
-        userProfileNameEl.textContent = first;
+        userProfileNameEl.textContent = firstNameFallbackFromAuth(user);
       }
 
       showApp();
       setAuthBusy(false);
 
-      if (typeof onAuthed === "function") await onAuthed(user);
+      if (typeof onAuthed === "function") {
+        await onAuthed(user);
+      }
     } catch (e) {
       console.error(e);
       setAuthBusy(false);
@@ -886,25 +851,8 @@ async function initAuthGate({ onAuthed } = {}) {
   });
 }
 
-/* =========================================================
-   YOUR EXISTING PORTAL LOGIC BELOW
-   (No changes required here, except:
-    - call initAuthGate({ onAuthed: loadIssuesFromFirestore })
-    - and ensure loadIssuesFromFirestore exists)
-========================================================= */
-
 /* =========
-   (Placeholder) Firestore issues loader hook
-   Replace with your existing function if already present.
-========= */
-
-async function loadIssuesFromFirestore() {
-  // If you already have this in your script, delete this stub.
-  // This stub is here only to prevent runtime errors if you paste this file standalone.
-}
-
-/* =========
-   Theme Toggle (keep your existing)
+   Theme Toggle
 ========= */
 
 const themeToggle = document.getElementById("themeToggle");
@@ -940,23 +888,11 @@ if (themeToggle) {
 async function init() {
   applySavedTheme();
 
-  // Auth gate: load issues only after authenticated + profile ensured
   await initAuthGate({
     onAuthed: async () => {
-      // Call your real loader here
       await loadIssuesFromFirestore();
     }
   });
 }
 
 init();
-
-/* =========================================================
-   Minimal CSS hooks needed for inline field errors + pill
-   (Add to your CSS if not present)
-   .auth-inline-error { margin-top:6px; font-size:12px; color: rgba(239,68,68,1); font-weight:700; }
-   .auth-input-error { border-color: rgba(239,68,68,0.55) !important; box-shadow: 0 0 0 4px rgba(239,68,68,0.10) !important; }
-   .user-pill { display:inline-flex; align-items:center; gap:8px; padding:8px 10px; border:1px solid var(--border); border-radius:999px; background: var(--panel); }
-   .user-initials { width:26px; height:26px; border-radius:999px; display:inline-flex; align-items:center; justify-content:center; border:1px solid var(--border2); font-weight:900; font-size:12px; }
-   .user-first { font-weight:900; font-size:13px; color: var(--text); }
-========================================================= */
