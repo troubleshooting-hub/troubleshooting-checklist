@@ -154,7 +154,7 @@ input {
 }
 
 .auth-copy {
-  margin-top: 20px;
+  margin-top: 6px;
   text-align: center;
   display: flex;
   flex-direction: column;
@@ -368,7 +368,7 @@ input {
   }
 
   .auth-copy {
-    margin-top: 18px;
+    margin-top: 6px;
   }
 
   .auth-copy h1 {
@@ -430,7 +430,7 @@ input {
   }
 
   .auth-copy {
-    margin-top: 16px;
+    margin-top: 6px;
     gap: 8px;
   }
 
