@@ -1178,4 +1178,15 @@ async function init() {
   showListScreen();
   await loadIssuesFromFirestore();
 }
+const logoutBtn = document.getElementById("logoutBtn");
+
+logoutBtn?.addEventListener("click", async () => {
+  try {
+    await window.firebaseAuthFns.signOut(window.auth);
+    window.location.href = "./index.html";
+  } catch (e) {
+    console.error(e);
+    alert("Logout failed");
+  }
+});
 init();
