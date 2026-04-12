@@ -1,18 +1,17 @@
 /* =========================================================
-   Troubleshooting Checklist Portal — AUTH + USER PROFILES
-   FIXED:
-   - No infinite "Checking session..." state
-   - Fallback only hides loader, does NOT block Firebase callback
-   - Email login / signup / reset password
-   - Google sign-in
-   - User profile creation in Firestore
-   - Header first-name + avatar initials
+   Troubleshooting Checklist Portal
+   UPDATE in this version:
+   - 3-dot menu stays at END (right side) of each issue row
+   - Clicking dots does NOT open details
+   - Menu is anchored to the button (right side)
+   - Recycle Bin support (soft delete + restore):
+       * Delete moves issue to "Deleted / Bin" view (sets { deleted: true, deletedAt })
+       * Restore brings it back (sets { deleted: false, deletedAt: null })
+   - Works even if Bin tab/section is not yet in index.html (fails gracefully)
 ========================================================= */
-
 /* =========
    Helpers
 ========= */
-
 function escapeHtml(str = "") {
   return String(str)
     .replaceAll("&", "&amp;")
@@ -21,839 +20,1133 @@ function escapeHtml(str = "") {
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
 }
-
-function normalizeFullName(firstName = "", lastName = "") {
-  const full = `${String(firstName || "").trim()} ${String(lastName || "").trim()}`.trim();
-  const collapsed = full.replace(/\s+/g, " ").trim();
-  return {
-    fullName: collapsed,
-    fullNameKey: collapsed.toLowerCase()
-  };
-}
-
-function looksLikeEmail(email = "") {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || "").trim());
-}
-
-function firstNameFallbackFromAuth(user) {
-  const displayName = String(user?.displayName || "").trim();
-  if (displayName) return displayName.split(/\s+/)[0] || "User";
-
-  const email = String(user?.email || "").trim();
-  if (email.includes("@")) return email.split("@")[0] || "User";
-
-  return "User";
-}
-
-function initialsFromName(first = "", last = "") {
-  const a = (first || "").trim()[0] || "";
-  const b = (last || "").trim()[0] || "";
-  return (a + b).toUpperCase() || a.toUpperCase() || "U";
-}
-
-function splitName(displayName = "") {
-  const clean = String(displayName || "").trim().replace(/\s+/g, " ");
-  if (!clean) return { firstName: "", lastName: "" };
-
-  const parts = clean.split(" ");
-  return {
-    firstName: parts[0] || "",
-    lastName: parts.slice(1).join(" ").trim()
-  };
-}
-
-/* =========
-   Auth DOM
-========= */
-
-const authGate = document.getElementById("authGate");
-const appRoot = document.getElementById("appRoot");
-
-const authLoading = document.getElementById("authLoading");
-
-const authCardTitle = document.getElementById("authCardTitle");
-const authCardSub = document.getElementById("authCardSub");
-const authError = document.getElementById("authError");
-
-const authFormView = document.getElementById("authFormView");
-const authResetView = document.getElementById("authResetView");
-
-const authNameRow = document.getElementById("authNameRow");
-const authFirstName = document.getElementById("authFirstName");
-const authLastName = document.getElementById("authLastName");
-
-const authEmail = document.getElementById("authEmail");
-const authPassword = document.getElementById("authPassword");
-
-const authPrimaryBtn = document.getElementById("authPrimaryBtn");
-const googleSignInBtn = document.getElementById("googleSignInBtn");
-
-const authBottomText = document.getElementById("authBottomText");
-const authToggleModeBtn = document.getElementById("authToggleModeBtn");
-
-const authForgotBtn = document.getElementById("authForgotBtn");
-const authTogglePwBtn = document.getElementById("authTogglePwBtn");
-
-const authResetEmail = document.getElementById("authResetEmail");
-const authResetSendBtn = document.getElementById("authResetSendBtn");
-const authResetBackBtn = document.getElementById("authResetBackBtn");
-
-const authLogoutBtn = document.getElementById("authLogoutBtn");
-
-const userProfileNameEl = document.getElementById("userProfileName");
-const userProfileAvatarEl = document.getElementById("userProfileAvatar");
-
-const themeToggle = document.getElementById("themeToggle");
-
-/* =========
-   Firebase readiness
-========= */
-
-function ensureAuthReady() {
-  return !!(window.auth && window.firebaseAuthFns);
-}
-
-function ensureFirestoreReady() {
-  return !!(window.db && window.firebaseFns);
-}
-
-function requireFirestoreFns(names = []) {
-  if (!ensureFirestoreReady()) return { ok: false, missing: names };
-  const missing = names.filter((name) => !window.firebaseFns?.[name]);
-  return { ok: missing.length === 0, missing };
-}
-
-/* =========
-   UI state
-========= */
-
-const AUTH_VIEW = {
-  LOGIN: "login",
-  SIGNUP: "signup",
-  RESET: "reset"
-};
-
-let authView = AUTH_VIEW.LOGIN;
-let authBusy = false;
-let authListenerHandled = false;
-let authFallbackTimer = null;
-let authUIBound = false;
-
-function showAuthGate() {
-  authGate?.classList.remove("hidden");
-  appRoot?.classList.add("hidden");
-}
-
-function showApp() {
-  authGate?.classList.add("hidden");
-  appRoot?.classList.remove("hidden");
-}
-
-function setAuthError(msg = "") {
-  if (!authError) return;
-
-  if (!msg) {
-    authError.textContent = "";
-    authError.classList.add("hidden");
-    return;
-  }
-
-  authError.textContent = msg;
-  authError.classList.remove("hidden");
-}
-
-function ensureInlineErrorEl(inputEl) {
-  if (!inputEl) return null;
-
-  const id = inputEl.id || "";
-  let el = document.getElementById(`${id}Error`);
-  if (el) return el;
-
-  el = document.createElement("div");
-  el.id = `${id}Error`;
-  el.className = "auth-inline-error hidden";
-  inputEl.insertAdjacentElement("afterend", el);
-  return el;
-}
-
-function setFieldError(inputEl, msg = "") {
-  const errEl = ensureInlineErrorEl(inputEl);
-  if (!errEl || !inputEl) return;
-
-  if (!msg) {
-    errEl.textContent = "";
-    errEl.classList.add("hidden");
-    inputEl.classList.remove("auth-input-error");
-    return;
-  }
-
-  errEl.textContent = msg;
-  errEl.classList.remove("hidden");
-  inputEl.classList.add("auth-input-error");
-}
-
-function clearAllFieldErrors() {
-  [authFirstName, authLastName, authEmail, authPassword, authResetEmail].forEach((el) => {
-    if (el) setFieldError(el, "");
-  });
-}
-
-function setAuthBusy(isBusy, label = "Loading…") {
-  authBusy = !!isBusy;
-
-  [
-    authPrimaryBtn,
-    googleSignInBtn,
-    authToggleModeBtn,
-    authForgotBtn,
-    authTogglePwBtn,
-    authResetSendBtn,
-    authResetBackBtn,
-    authLogoutBtn
-  ]
+function linesToBullets(text = "") {
+  return text
+    .split("\n")
+    .map(s => s.trim())
     .filter(Boolean)
-    .forEach((btn) => {
-      btn.disabled = authBusy;
-    });
-
-  if (!authLoading) return;
-
-  if (authBusy) {
-    authLoading.classList.remove("hidden");
-    const txt = authLoading.querySelector(".auth-loading-text");
-    if (txt) txt.textContent = label;
-  } else {
-    authLoading.classList.add("hidden");
+    .map(s => s.replace(/^[-•\u2022]\s*/, "").trim())
+    .filter(Boolean);
+}
+function bulletsToHtml(items = []) {
+  if (!items.length) return "<div class='muted'>No checklist items.</div>";
+  return `<ul class="bullet-list">${items.map(li => `<li>${escapeHtml(li)}</li>`).join("")}</ul>`;
+}
+function safeUrl(url) {
+  const u = (url || "").trim();
+  if (!u) return "";
+  try {
+    new URL(u);
+    return u;
+  } catch {
+    return "";
   }
 }
-
-function renderAuthView(nextView) {
-  authView = nextView;
-  setAuthError("");
-  clearAllFieldErrors();
-
-  authFormView?.classList.toggle("hidden", authView === AUTH_VIEW.RESET);
-  authResetView?.classList.toggle("hidden", authView !== AUTH_VIEW.RESET);
-  authNameRow?.classList.toggle("hidden", authView !== AUTH_VIEW.SIGNUP);
-  authForgotBtn?.classList.toggle("hidden", authView !== AUTH_VIEW.LOGIN);
-  authTogglePwBtn?.classList.toggle("hidden", authView === AUTH_VIEW.RESET);
-
-  if (authView === AUTH_VIEW.LOGIN) {
-    if (authCardTitle) authCardTitle.textContent = "Login to your account";
-    if (authCardSub) authCardSub.textContent = "Sign in to continue";
-    if (authPrimaryBtn) authPrimaryBtn.textContent = "Login now";
-    if (authBottomText) authBottomText.textContent = "Don’t have an account?";
-    if (authToggleModeBtn) authToggleModeBtn.textContent = "Sign up";
-  }
-
-  if (authView === AUTH_VIEW.SIGNUP) {
-    if (authCardTitle) authCardTitle.textContent = "Create your account";
-    if (authCardSub) authCardSub.textContent = "Sign up to continue";
-    if (authPrimaryBtn) authPrimaryBtn.textContent = "Create account";
-    if (authBottomText) authBottomText.textContent = "Already have an account?";
-    if (authToggleModeBtn) authToggleModeBtn.textContent = "Login";
-  }
-
-  if (authView === AUTH_VIEW.RESET) {
-    if (authCardTitle) authCardTitle.textContent = "Reset your password";
-    if (authCardSub) authCardSub.textContent = "We’ll email you a reset link.";
-  }
+function normalizeForCompare(s = "") {
+  return String(s || "")
+    .toLowerCase()
+    .replace(/\u2019/g, "'")
+    .replace(/[\u2022•]/g, "")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
-
+function isStepLikeLine(line = "") {
+  const t = normalizeForCompare(line);
+  if (!t) return false;
+  const skip = [
+    "additionally",
+    "checklist",
+    "i have checked the following",
+    "i have checked the following:",
+    "i have checked",
+    "verified",
+    "notes",
+    "root cause",
+    "solution"
+  ];
+  return !skip.includes(t);
+}
+function uniqueNormalized(items = []) {
+  const seen = new Set();
+  const out = [];
+  for (const raw of items) {
+    const n = normalizeForCompare(raw);
+    if (!n) continue;
+    if (seen.has(n)) continue;
+    seen.add(n);
+    out.push({ raw, norm: n });
+  }
+  return out;
+}
+function tokenize(s = "") {
+  return normalizeForCompare(s)
+    .split(" ")
+    .map(w => w.trim())
+    .filter(Boolean)
+    .filter(w => w.length >= 3);
+}
+function jaccardScore(aTokens = [], bTokens = []) {
+  const A = new Set(aTokens);
+  const B = new Set(bTokens);
+  if (!A.size && !B.size) return 0;
+  let inter = 0;
+  for (const x of A) if (B.has(x)) inter++;
+  const union = new Set([...A, ...B]).size;
+  return union ? inter / union : 0;
+}
 /* =========
-   Firebase error mapping
+   App State
 ========= */
-
-function mapAuthError(error) {
-  const code = error?.code || "";
-
-  if (code === "auth/invalid-email") return "Please enter a valid email address.";
-  if (code === "auth/missing-password") return "Please enter your password.";
-  if (code === "auth/wrong-password") return "Incorrect password. Please try again.";
-  if (code === "auth/user-not-found") return "No account found for this email.";
-  if (code === "auth/email-already-in-use") return "This email is already registered. Please login instead.";
-  if (code === "auth/too-many-requests") return "Too many attempts. Please wait a bit and try again.";
-  if (code === "auth/popup-closed-by-user") return "Google sign-in was closed. Please try again.";
-  if (code === "auth/cancelled-popup-request") return "";
-  if (code === "auth/network-request-failed") return "Network error. Please check your internet connection.";
-  return error?.message || "Authentication failed. Please try again.";
-}
-
+const DEFAULT_APPS = [
+  "Active Directory",
+  "Azure AD",
+  "Okta",
+  "ADP",
+  "Paycor",
+  "Dayforce",
+  "Paylocity"
+];
+const DEFAULT_TEMPLATES = [
+  {
+    name: "Template 1",
+    body: `Subject: Update on your issue
+Hi there,
+Thanks for your patience. We investigated the issue and identified the cause.
+We are applying the fix now and will confirm once everything is stable.
+Regards,`
+  },
+  {
+    name: "Template 2",
+    body: `Subject: Request for additional details
+Hi there,
+To proceed, could you please confirm the following:
+- Environment / tenant details
+- Recent changes
+- Any error message or screenshot
+Once we have this, we will continue the investigation.
+Regards,`
+  },
+  {
+    name: "Template 3",
+    body: `Subject: Issue resolved
+Hi there,
+We implemented the fix and the issue should now be resolved.
+If you still see the issue, please reply with the latest timestamp and any new error details.
+Regards,`
+  }
+];
+let allIssues = [];        // includes active + deleted
+let issues = [];           // active only (derived)
+let deletedIssues = [];    // deleted only (derived)
+let selectedIssueId = null;
+let selectedTemplateIndex = 0;
+let templateState = structuredClone(DEFAULT_TEMPLATES);
+// Used for list 3-dot menus
+let openMenuIssueId = null;
+// Simple view router (common/new/help/bin)
+let activeView = "common";
 /* =========
-   Firestore user profile helpers
+   DOM
 ========= */
-
-async function getUserDoc(uid) {
-  const need = requireFirestoreFns(["doc", "getDoc"]);
-  if (!need.ok) throw new Error(`Missing Firestore fns: ${need.missing.join(", ")}`);
-
-  const { doc, getDoc } = window.firebaseFns;
-  return await getDoc(doc(window.db, "users", uid));
+const tabCommon = document.getElementById("tabCommon");
+const tabNew = document.getElementById("tabNew");
+const tabHelp = document.getElementById("tabHelp");
+// Optional (only if you add these in index.html later)
+const tabBin = document.getElementById("tabBin");
+const commonSection = document.getElementById("commonSection");
+const newSection = document.getElementById("newSection");
+const helpSection = document.getElementById("helpSection");
+// Optional (only if you add these in index.html later)
+const binSection = document.getElementById("binSection");
+const searchInput = document.getElementById("searchInput");
+const commonListView = document.getElementById("commonListView");
+const commonDetailView = document.getElementById("commonDetailView");
+const backToListBtn = document.getElementById("backToListBtn");
+const issueList = document.getElementById("issueList");
+const issueDetailsPanel = document.getElementById("issueDetailsPanel");
+const issuesCountPill = document.getElementById("issuesCountPill");
+// Optional bin list UI (only if you add these in index.html later)
+const binList = document.getElementById("binList");
+const binCountPill = document.getElementById("binCountPill");
+// Form
+const issueDescription = document.getElementById("issueDescription");
+const applicationSelect = document.getElementById("applicationSelect");
+const addNewAppBtn = document.getElementById("addNewAppBtn");
+const rootCause = document.getElementById("rootCause");
+const checklists = document.getElementById("checklists");
+const zendeskLink = document.getElementById("zendeskLink");
+const solution = document.getElementById("solution");
+const templateTabs = document.getElementById("templateTabs");
+const templateEditor = document.getElementById("templateEditor");
+const addTemplateBtn = document.getElementById("addTemplateBtn");
+const saveIssueBtn = document.getElementById("saveIssueBtn");
+const resetIssueBtn = document.getElementById("resetIssueBtn");
+// Help
+const helpIssueInput = document.getElementById("helpIssueInput");
+const helpCheckedInput = document.getElementById("helpCheckedInput");
+const helpAnalyzeBtn = document.getElementById("helpAnalyzeBtn");
+const helpClearBtn = document.getElementById("helpClearBtn");
+const helpResults = document.getElementById("helpResults");
+/* =========
+   Duplicate suggestion UI
+========= */
+let dupSuggestionEl = null;
+function ensureDupSuggestionBox() {
+  if (dupSuggestionEl) return dupSuggestionEl;
+  if (!issueDescription) return null;
+  const wrap = issueDescription.parentElement;
+  if (!wrap) return null;
+  const box = document.createElement("div");
+  box.id = "dupSuggestionBox";
+  box.className = "dup-box hidden";
+  wrap.appendChild(box);
+  dupSuggestionEl = box;
+  return box;
 }
-
-async function createOrUpdateUserDoc(uid, data) {
-  const need = requireFirestoreFns(["doc", "setDoc"]);
-  if (!need.ok) throw new Error(`Missing Firestore fns: ${need.missing.join(", ")}`);
-
-  const { doc, setDoc } = window.firebaseFns;
-  await setDoc(doc(window.db, "users", uid), data, { merge: true });
+function findSimilarIssuesForNewIssue(descText) {
+  const q = normalizeForCompare(descText);
+  if (!q) return { exact: null, suggestions: [] };
+  const qTokens = tokenize(q);
+  const suggestions = [];
+  for (const it of issues) {
+    const cand = normalizeForCompare(it.issueDescription || "");
+    if (!cand) continue;
+    if (cand === q) {
+      return { exact: it, suggestions: [] };
+    }
+    const score = jaccardScore(qTokens, tokenize(cand));
+    if (score >= 0.45) suggestions.push({ issue: it, score });
+  }
+  suggestions.sort((a, b) => b.score - a.score);
+  return { exact: null, suggestions: suggestions.slice(0, 3) };
 }
-
-async function checkFullNameKeyCollision(fullNameKey, exceptUid = "") {
-  const need = requireFirestoreFns(["collection", "query", "where", "limit", "getDocs"]);
-  if (!need.ok) throw new Error(`Missing Firestore fns: ${need.missing.join(", ")}`);
-
-  const { collection, query, where, limit, getDocs } = window.firebaseFns;
-  const q = query(
-    collection(window.db, "users"),
-    where("fullNameKey", "==", fullNameKey),
-    limit(1)
-  );
-
-  const snap = await getDocs(q);
-  if (snap.empty) return false;
-
-  const hit = snap.docs[0];
-  if (exceptUid && hit.id === exceptUid) return false;
-
+function renderDuplicateSuggestions() {
+  const box = ensureDupSuggestionBox();
+  if (!box) return;
+  const text = (issueDescription?.value || "").trim();
+  if (!text) {
+    box.classList.add("hidden");
+    box.innerHTML = "";
+    return;
+  }
+  const { exact, suggestions } = findSimilarIssuesForNewIssue(text);
+  if (!exact && !suggestions.length) {
+    box.classList.add("hidden");
+    box.innerHTML = "";
+    return;
+  }
+  if (exact) {
+    box.classList.remove("hidden");
+    box.innerHTML = `
+      <div class="dup-title-text">A similar issue already exists.</div>
+      <div class="hint" style="margin-top:6px;">This looks like an exact duplicate (by description).</div>
+      <div class="dup-list">
+        <div class="dup-item">
+          <div><strong>${escapeHtml(exact.issueDescription || "")}</strong></div>
+          <div class="dup-score">${escapeHtml(exact.application || "")}</div>
+        </div>
+      </div>
+      <div class="hint" style="margin-top:10px;">Tip: Open it in Common Issues and edit instead of adding again.</div>
+    `;
+    return;
+  }
+  box.classList.remove("hidden");
+  box.innerHTML = `
+    <div class="dup-title-text">We see similar issues already added. Can you check if it is related?</div>
+    <div class="dup-list">
+      ${suggestions
+        .map(
+          ({ issue, score }) => `
+          <div class="dup-item">
+            <div><strong>${escapeHtml(issue.issueDescription || "")}</strong></div>
+            <div class="dup-score">${escapeHtml(issue.application || "")} • Similarity ${(score * 100).toFixed(0)}%</div>
+          </div>
+        `
+        )
+        .join("")}
+    </div>
+  `;
+}
+issueDescription?.addEventListener("input", renderDuplicateSuggestions);
+/* =========
+   Firestore
+========= */
+function ensureFirestoreReady() {
+  if (!window.db || !window.firebaseFns) {
+    alert("Firebase is not ready yet. Please refresh the page.");
+    return false;
+  }
   return true;
 }
-
-async function tryAcquireNameLock(fullNameKey, uid) {
-  const hasTx = !!window.firebaseFns?.runTransaction;
-  const hasDoc = !!window.firebaseFns?.doc;
-  const hasServerTimestamp = !!window.firebaseFns?.serverTimestamp;
-
-  if (!(hasTx && hasDoc && hasServerTimestamp)) {
-    const collision = await checkFullNameKeyCollision(fullNameKey, uid);
-    if (collision) return { ok: false, reason: "collision" };
-    return { ok: true, reason: "no-lock-fallback" };
-  }
-
-  const { doc, runTransaction, serverTimestamp } = window.firebaseFns;
-  const lockRef = doc(window.db, "userNameLocks", fullNameKey);
-
-  return await runTransaction(window.db, async (tx) => {
-    const snap = await tx.get(lockRef);
-
-    if (snap.exists()) {
-      const existingUid = snap.data()?.uid || "";
-      if (existingUid && existingUid !== uid) return { ok: false, reason: "collision" };
-      return { ok: true, reason: "already-locked" };
-    }
-
-    tx.set(lockRef, {
-      uid,
-      createdAt: serverTimestamp()
-    });
-
-    return { ok: true, reason: "locked" };
-  });
+function splitActiveDeleted() {
+  // Treat anything with deleted === true as deleted
+  issues = allIssues.filter(x => !x?.deleted);
+  deletedIssues = allIssues.filter(x => !!x?.deleted);
 }
-
-async function ensureUserProfileForAuthUser(user, providerHint = "") {
-  if (!user?.uid || !ensureFirestoreReady()) return null;
-
-  try {
-    const existingSnap = await getUserDoc(user.uid);
-    if (existingSnap.exists()) return existingSnap.data();
-  } catch (error) {
-    console.warn("User profile lookup failed:", error);
-    return null;
-  }
-
-  const authProvider =
-    providerHint ||
-    (user?.providerData?.[0]?.providerId === "password" ? "password" : "google");
-
-  let firstName = "";
-  let lastName = "";
-
-  if (user.displayName) {
-    const parts = splitName(user.displayName);
-    firstName = parts.firstName;
-    lastName = parts.lastName;
-  }
-
-  if (!firstName) {
-    firstName = firstNameFallbackFromAuth(user);
-  }
-
-  const norm = normalizeFullName(firstName, lastName);
-
-  try {
-    const collision = await checkFullNameKeyCollision(norm.fullNameKey, user.uid);
-    if (collision) {
-      setAuthError("Your name already exists in the system. Please contact admin.");
-      await window.firebaseAuthFns.signOut(window.auth);
-      showAuthGate();
-      renderAuthView(AUTH_VIEW.LOGIN);
-      return null;
-    }
-
-    await createOrUpdateUserDoc(user.uid, {
-      uid: user.uid,
-      firstName: String(firstName || "").trim(),
-      lastName: String(lastName || "").trim(),
-      fullName: norm.fullName,
-      fullNameKey: norm.fullNameKey,
-      email: user.email || "",
-      createdAt: window.firebaseFns.serverTimestamp(),
-      authProvider
-    });
-  } catch (error) {
-    console.warn("User profile creation skipped:", error);
-  }
-
-  return null;
-}
-
-async function updateHeaderUserName(user) {
-  if (!userProfileNameEl) return;
-
-  let first = "";
-  let last = "";
-
-  try {
-    const snap = await getUserDoc(user.uid);
-    if (snap.exists()) {
-      const data = snap.data() || {};
-      first = String(data.firstName || "").trim();
-      last = String(data.lastName || "").trim();
-    }
-  } catch {}
-
-  if (!first) {
-    first = firstNameFallbackFromAuth(user);
-  }
-
-  const initials = initialsFromName(first, last);
-
-  if (userProfileAvatarEl) userProfileAvatarEl.textContent = initials;
-  userProfileNameEl.textContent = first;
-}
-
-/* =========
-   Validation
-========= */
-
-function validateSignupFields() {
-  clearAllFieldErrors();
-
-  const first = String(authFirstName?.value || "").trim();
-  const last = String(authLastName?.value || "").trim();
-  const email = String(authEmail?.value || "").trim();
-  const pw = String(authPassword?.value || "");
-
-  let ok = true;
-
-  if (first.length < 2) {
-    setFieldError(authFirstName, "First name must be at least 2 characters.");
-    ok = false;
-  }
-
-  if (last.length < 2) {
-    setFieldError(authLastName, "Last name must be at least 2 characters.");
-    ok = false;
-  }
-
-  if (!looksLikeEmail(email)) {
-    setFieldError(authEmail, "Please enter a valid email address.");
-    ok = false;
-  }
-
-  if (pw.length < 6) {
-    setFieldError(authPassword, "Password must be at least 6 characters.");
-    ok = false;
-  }
-
-  return { ok, first, last, email, pw };
-}
-
-function validateLoginFields() {
-  clearAllFieldErrors();
-
-  const email = String(authEmail?.value || "").trim();
-  const pw = String(authPassword?.value || "");
-
-  let ok = true;
-
-  if (!looksLikeEmail(email)) {
-    setFieldError(authEmail, "Please enter a valid email address.");
-    ok = false;
-  }
-
-  if (!pw) {
-    setFieldError(authPassword, "Please enter your password.");
-    ok = false;
-  }
-
-  return { ok, email, pw };
-}
-
-/* =========
-   Auth actions
-========= */
-
-async function handlePasswordSignup() {
-  if (!ensureAuthReady()) {
-    setAuthError("Auth is not ready. Please verify Firebase Auth wiring in index.html.");
-    return;
-  }
-
-  if (!ensureFirestoreReady()) {
-    setAuthError("Firestore is not ready. Please verify Firestore wiring in index.html.");
-    return;
-  }
-
-  const need = requireFirestoreFns(["getDoc", "where", "limit"]);
-  if (!need.ok) {
-    setAuthError(`Missing Firestore exports in index.html: ${need.missing.join(", ")}`);
-    return;
-  }
-
-  const { ok, first, last, email, pw } = validateSignupFields();
-  if (!ok) return;
-
-  const norm = normalizeFullName(first, last);
-  let createdUser = null;
-
-  try {
-    setAuthBusy(true, "Creating account…");
-    const userCred = await window.firebaseAuthFns.createUserWithEmailAndPassword(window.auth, email, pw);
-    createdUser = userCred.user;
-
-    setAuthBusy(true, "Finalizing profile…");
-    const lockRes = await tryAcquireNameLock(norm.fullNameKey, createdUser.uid);
-
-    if (!lockRes.ok) {
-      setFieldError(
-        authLastName,
-        "An account with this name already exists. Please contact admin or use a different name."
-      );
-
-      try {
-        await window.firebaseAuthFns.signOut(window.auth);
-      } catch {}
-
-      if (window.firebaseAuthFns.deleteUser) {
-        try {
-          await window.firebaseAuthFns.deleteUser(createdUser);
-        } catch {}
-      }
-
-      renderAuthView(AUTH_VIEW.SIGNUP);
-      showAuthGate();
-      setAuthBusy(false);
-      return;
-    }
-
-    await window.firebaseAuthFns.updateProfile(createdUser, {
-      displayName: norm.fullName
-    });
-
-    await createOrUpdateUserDoc(createdUser.uid, {
-      uid: createdUser.uid,
-      firstName: first,
-      lastName: last,
-      fullName: norm.fullName,
-      fullNameKey: norm.fullNameKey,
-      email,
-      createdAt: window.firebaseFns.serverTimestamp(),
-      authProvider: "password"
-    });
-
-    setAuthBusy(false);
-  } catch (error) {
-    console.error(error);
-    setAuthBusy(false);
-
-    if (createdUser) {
-      try {
-        await window.firebaseAuthFns.signOut(window.auth);
-      } catch {}
-    }
-
-    const msg = mapAuthError(error);
-    if (msg) setAuthError(msg);
-  }
-}
-
-async function handlePasswordLogin() {
-  if (!ensureAuthReady()) {
-    setAuthError("Auth is not ready. Please verify Firebase Auth wiring in index.html.");
-    return;
-  }
-
-  const { ok, email, pw } = validateLoginFields();
-  if (!ok) return;
-
-  try {
-    setAuthError("");
-    setAuthBusy(true, "Signing in…");
-    await window.firebaseAuthFns.signInWithEmailAndPassword(window.auth, email, pw);
-    setAuthBusy(false);
-  } catch (error) {
-    console.error(error);
-    setAuthBusy(false);
-    const msg = mapAuthError(error);
-    if (msg) setAuthError(msg);
-  }
-}
-
-async function handleGoogleSignIn() {
-  if (!ensureAuthReady()) {
-    setAuthError("Auth is not ready. Please verify Firebase Auth wiring in index.html.");
-    return;
-  }
-
-  try {
-    setAuthError("");
-    setAuthBusy(true, "Opening Google sign-in…");
-    const provider = new window.firebaseAuthFns.GoogleAuthProvider();
-    await window.firebaseAuthFns.signInWithPopup(window.auth, provider);
-    setAuthBusy(false);
-  } catch (error) {
-    console.error(error);
-    setAuthBusy(false);
-    const msg = mapAuthError(error);
-    if (msg) setAuthError(msg);
-  }
-}
-
-async function handlePasswordReset() {
-  if (!ensureAuthReady()) {
-    setAuthError("Auth is not ready. Please verify Firebase Auth wiring in index.html.");
-    return;
-  }
-
-  clearAllFieldErrors();
-  const email = String(authResetEmail?.value || "").trim();
-
-  if (!looksLikeEmail(email)) {
-    setFieldError(authResetEmail, "Please enter a valid email address.");
-    return;
-  }
-
-  try {
-    setAuthBusy(true, "Sending reset email…");
-    const continueUrl = `${location.origin}${location.pathname.replace(/\/[^/]*$/, "/")}`;
-    await window.firebaseAuthFns.sendPasswordResetEmail(window.auth, email, { url: continueUrl });
-    setAuthBusy(false);
-    setAuthError("If an account exists for this email, a reset link has been sent.");
-  } catch (error) {
-    console.error(error);
-    setAuthBusy(false);
-    const msg = mapAuthError(error);
-    if (msg) setAuthError(msg);
-  }
-}
-
-/* =========
-   Bind auth UI
-========= */
-
-function bindAuthUI() {
-  if (authUIBound) return;
-  authUIBound = true;
-
-  authToggleModeBtn?.addEventListener("click", () => {
-    if (authBusy) return;
-    if (authView === AUTH_VIEW.LOGIN) renderAuthView(AUTH_VIEW.SIGNUP);
-    else if (authView === AUTH_VIEW.SIGNUP) renderAuthView(AUTH_VIEW.LOGIN);
-  });
-
-  authForgotBtn?.addEventListener("click", () => {
-    if (authBusy) return;
-    if (authResetEmail && authEmail) authResetEmail.value = String(authEmail.value || "").trim();
-    renderAuthView(AUTH_VIEW.RESET);
-  });
-
-  authResetBackBtn?.addEventListener("click", () => {
-    if (authBusy) return;
-    renderAuthView(AUTH_VIEW.LOGIN);
-  });
-
-  authTogglePwBtn?.addEventListener("click", () => {
-    if (!authPassword) return;
-    const isPassword = authPassword.type === "password";
-    authPassword.type = isPassword ? "text" : "password";
-    authTogglePwBtn.setAttribute("aria-label", isPassword ? "Hide password" : "Show password");
-  });
-
-  authPrimaryBtn?.addEventListener("click", async () => {
-    if (authBusy) return;
-    if (authView === AUTH_VIEW.LOGIN) return handlePasswordLogin();
-    if (authView === AUTH_VIEW.SIGNUP) return handlePasswordSignup();
-  });
-
-  googleSignInBtn?.addEventListener("click", async () => {
-    if (authBusy) return;
-    await handleGoogleSignIn();
-  });
-
-  authResetSendBtn?.addEventListener("click", async () => {
-    if (authBusy) return;
-    await handlePasswordReset();
-  });
-
-  authEmail?.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") authPrimaryBtn?.click();
-  });
-  authPassword?.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") authPrimaryBtn?.click();
-  });
-  authFirstName?.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") authPrimaryBtn?.click();
-  });
-  authLastName?.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") authPrimaryBtn?.click();
-  });
-  authResetEmail?.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") authResetSendBtn?.click();
-  });
-
-  authLogoutBtn?.addEventListener("click", async () => {
-    if (!ensureAuthReady()) return;
-    try {
-      await window.firebaseAuthFns.signOut(window.auth);
-      showAuthGate();
-      renderAuthView(AUTH_VIEW.LOGIN);
-    } catch (error) {
-      console.error(error);
-    }
-  });
-}
-
-/* =========
-   Issues loader hook
-========= */
-
 async function loadIssuesFromFirestore() {
   if (!ensureFirestoreReady()) return;
-
-  const need = requireFirestoreFns(["collection", "getDocs", "query", "orderBy"]);
-  if (!need.ok) {
-    console.warn("Missing Firestore functions for issues loader:", need.missing.join(", "));
-    return;
-  }
-
   const { collection, getDocs, query, orderBy } = window.firebaseFns;
   const colRef = collection(window.db, "issues");
-
   try {
     const q = query(colRef, orderBy("createdAt", "desc"));
     const snap = await getDocs(q);
-    window.allIssues = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-  } catch (error) {
-    console.warn("OrderBy(createdAt) failed, falling back to unsorted getDocs()", error);
+    allIssues = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch (e) {
+    console.warn("OrderBy(createdAt) failed, falling back to unsorted getDocs()", e);
     const snap = await getDocs(colRef);
-    window.allIssues = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    allIssues = snap.docs.map(d => ({ id: d.id, ...d.data() }));
   }
-
-  if (typeof splitActiveDeleted === "function") splitActiveDeleted();
-  if (typeof renderIssueList === "function") renderIssueList();
-  if (typeof renderBinList === "function") renderBinList();
-  if (typeof renderDuplicateSuggestions === "function") renderDuplicateSuggestions();
-
-  if (
-    typeof isInDetailScreen === "function" &&
-    typeof renderSelectedIssueDetails === "function" &&
-    isInDetailScreen() &&
-    window.selectedIssueId
-  ) {
+  splitActiveDeleted();
+  renderIssueList();
+  renderBinList();         // safe even if bin UI doesn't exist
+  renderDuplicateSuggestions();
+  if (isInDetailScreen() && selectedIssueId) {
     renderSelectedIssueDetails();
   }
 }
-
+async function softDeleteIssueInFirestore(docId) {
+  if (!ensureFirestoreReady()) return;
+  const { doc, updateDoc, serverTimestamp } = window.firebaseFns;
+  const ref = doc(window.db, "issues", docId);
+  await updateDoc(ref, {
+    deleted: true,
+    deletedAt: serverTimestamp()
+  });
+}
+async function restoreIssueInFirestore(docId) {
+  if (!ensureFirestoreReady()) return;
+  const { doc, updateDoc } = window.firebaseFns;
+  const ref = doc(window.db, "issues", docId);
+  await updateDoc(ref, {
+    deleted: false,
+    deletedAt: null
+  });
+}
+// Optional: permanently delete from DB (only from bin)
+async function hardDeleteIssueFromFirestore(docId) {
+  if (!ensureFirestoreReady()) return;
+  const { doc, deleteDoc } = window.firebaseFns;
+  const ref = doc(window.db, "issues", docId);
+  await deleteDoc(ref);
+}
 /* =========
-   Auth init
+   Tabs / Sections
 ========= */
-
-async function initAuthGate({ onAuthed } = {}) {
-  if (!authGate || !appRoot) {
-    if (typeof onAuthed === "function") await onAuthed(window.auth?.currentUser || null);
+function showOnlySection(which) {
+  activeView = which;
+  const isCommon = which === "common";
+  const isNew = which === "new";
+  const isHelp = which === "help";
+  const isBin = which === "bin";
+  tabCommon?.classList.toggle("active", isCommon);
+  tabNew?.classList.toggle("active", isNew);
+  tabHelp?.classList.toggle("active", isHelp);
+  tabBin?.classList.toggle("active", isBin);
+  commonSection?.classList.toggle("hidden", !isCommon);
+  newSection?.classList.toggle("hidden", !isNew);
+  helpSection?.classList.toggle("hidden", !isHelp);
+  binSection?.classList.toggle("hidden", !isBin);
+  // Search only for common list
+  if (searchInput) searchInput.style.display = isCommon ? "" : "none";
+  // If leaving common, reset to list view
+  if (!isCommon) showListScreen();
+  // Close any open menus on tab changes
+  closeAllIssueMenus();
+}
+tabCommon?.addEventListener("click", () => showOnlySection("common"));
+tabNew?.addEventListener("click", () => showOnlySection("new"));
+tabHelp?.addEventListener("click", () => showOnlySection("help"));
+tabBin?.addEventListener("click", () => showOnlySection("bin"));
+/* =========
+   Common Issues screens
+========= */
+function showListScreen() {
+  commonListView?.classList.remove("hidden");
+  commonDetailView?.classList.add("hidden");
+  if (issueDetailsPanel) issueDetailsPanel.innerHTML = "";
+  selectedIssueId = null;
+}
+function showDetailScreen(issueId) {
+  selectedIssueId = issueId;
+  commonListView?.classList.add("hidden");
+  commonDetailView?.classList.remove("hidden");
+  renderSelectedIssueDetails();
+}
+function isInDetailScreen() {
+  return commonDetailView ? !commonDetailView.classList.contains("hidden") : false;
+}
+backToListBtn?.addEventListener("click", showListScreen);
+/* =========
+   Application list
+========= */
+function loadApplicationOptions() {
+  if (!applicationSelect) return;
+  applicationSelect.innerHTML = `<option value="">Select application</option>`;
+  DEFAULT_APPS.forEach(app => {
+    const opt = document.createElement("option");
+    opt.value = app;
+    opt.textContent = app;
+    applicationSelect.appendChild(opt);
+  });
+}
+addNewAppBtn?.addEventListener("click", () => {
+  const name = prompt("Enter new application name:");
+  const cleaned = (name || "").trim();
+  if (!cleaned || !applicationSelect) return;
+  const opt = document.createElement("option");
+  opt.value = cleaned;
+  opt.textContent = cleaned;
+  applicationSelect.appendChild(opt);
+  applicationSelect.value = cleaned;
+});
+/* =========
+   Templates (New Issues)
+========= */
+function renderTemplateTabs() {
+  if (!templateTabs || !templateEditor) return;
+  templateTabs.innerHTML = "";
+  templateState.forEach((t, idx) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "template-tab" + (idx === selectedTemplateIndex ? " active" : "");
+    btn.textContent = t.name;
+    btn.addEventListener("click", () => {
+      templateState[selectedTemplateIndex].body = templateEditor.value;
+      selectedTemplateIndex = idx;
+      templateEditor.value = templateState[selectedTemplateIndex].body;
+      renderTemplateTabs();
+    });
+    templateTabs.appendChild(btn);
+  });
+}
+addTemplateBtn?.addEventListener("click", () => {
+  if (!templateEditor) return;
+  templateState[selectedTemplateIndex].body = templateEditor.value;
+  const nextNum = templateState.length + 1;
+  const name = prompt("Name for the new template:", `Template ${nextNum}`);
+  const cleaned = (name || "").trim();
+  if (!cleaned) return;
+  templateState.push({ name: cleaned, body: "" });
+  selectedTemplateIndex = templateState.length - 1;
+  renderTemplateTabs();
+  templateEditor.value = templateState[selectedTemplateIndex].body;
+});
+/* =========
+   Common Issues list + Menus
+========= */
+function getFilteredIssues() {
+  const q = (searchInput?.value || "").trim().toLowerCase();
+  if (!q) return issues;
+  return issues.filter(it => {
+    const hay = [
+      it.issueDescription,
+      it.application,
+      it.rootCause,
+      ...(it.checklistItems || [])
+    ]
+      .join(" ")
+      .toLowerCase();
+    return hay.includes(q);
+  });
+}
+function closeAllIssueMenus() {
+  openMenuIssueId = null;
+  document.querySelectorAll(".issue-menu").forEach(m => m.remove());
+}
+function toggleIssueMenu({ issueId, anchorEl, mode }) {
+  // mode: "active" (Delete) or "bin" (Restore / Delete permanently)
+  if (openMenuIssueId === issueId) {
+    closeAllIssueMenus();
     return;
   }
-
-  showAuthGate();
-  renderAuthView(AUTH_VIEW.LOGIN);
-
-  if (!ensureAuthReady()) {
-    setAuthError("Auth is not ready. Please verify Firebase Auth imports and window.firebaseAuthFns in index.html.");
-    return;
+  closeAllIssueMenus();
+  openMenuIssueId = issueId;
+  const menu = document.createElement("div");
+  menu.className = "issue-menu";
+  if (mode === "bin") {
+    menu.innerHTML = `
+      <button type="button" class="menu-item" data-action="restore">Restore</button>
+      <button type="button" class="menu-item danger" data-action="hard-delete">Delete permanently</button>
+    `;
+  } else {
+    menu.innerHTML = `
+      <button type="button" class="menu-item danger" data-action="delete">Move to Bin</button>
+    `;
   }
-
-  bindAuthUI();
-
-  const { onAuthStateChanged } = window.firebaseAuthFns;
-
-  setAuthBusy(true, "Checking session…");
-  authListenerHandled = false;
-
-  // Fallback only hides spinner; it does NOT block Firebase callback
-  authFallbackTimer = window.setTimeout(() => {
-    if (authListenerHandled) return;
-
-    console.warn("Auth session check is taking longer than expected. Showing login UI.");
-    setAuthBusy(false);
-    showAuthGate();
-    renderAuthView(AUTH_VIEW.LOGIN);
-  }, 4000);
-
-  onAuthStateChanged(window.auth, async (user) => {
-    authListenerHandled = true;
-
-    if (authFallbackTimer) {
-      clearTimeout(authFallbackTimer);
-      authFallbackTimer = null;
+  // Append inside the li (issue-item); CSS positions menu absolute top/right
+  const li = anchorEl.closest(".issue-item");
+  li?.appendChild(menu);
+  menu.addEventListener("click", async (e) => {
+    const btn = e.target.closest("button[data-action]");
+    if (!btn) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const action = btn.getAttribute("data-action");
+    if (action === "delete") {
+      await deleteIssueFlow(issueId);
+    } else if (action === "restore") {
+      await restoreIssueFlow(issueId);
+    } else if (action === "hard-delete") {
+      await hardDeleteIssueFlow(issueId);
     }
-
+    closeAllIssueMenus();
+  });
+}
+async function deleteIssueFlow(issueId) {
+  const it = issues.find(x => x.id === issueId);
+  const label = it?.issueDescription ? `"${it.issueDescription}"` : "this issue";
+  const ok = confirm(`Move ${label} to Bin?`);
+  if (!ok) return;
+  await softDeleteIssueInFirestore(issueId);
+  // If viewing this issue, go back to list
+  if (selectedIssueId === issueId) showListScreen();
+  await loadIssuesFromFirestore();
+}
+async function restoreIssueFlow(issueId) {
+  const it = deletedIssues.find(x => x.id === issueId);
+  const label = it?.issueDescription ? `"${it.issueDescription}"` : "this issue";
+  const ok = confirm(`Restore ${label}?`);
+  if (!ok) return;
+  await restoreIssueInFirestore(issueId);
+  await loadIssuesFromFirestore();
+}
+async function hardDeleteIssueFlow(issueId) {
+  const it = deletedIssues.find(x => x.id === issueId);
+  const label = it?.issueDescription ? `"${it.issueDescription}"` : "this issue";
+  const ok = confirm(`Permanently delete ${label}? This cannot be undone.`);
+  if (!ok) return;
+  await hardDeleteIssueFromFirestore(issueId);
+  await loadIssuesFromFirestore();
+}
+function renderIssueList() {
+  if (!issueList || !issuesCountPill) return;
+  closeAllIssueMenus();
+  const list = getFilteredIssues();
+  issuesCountPill.textContent = String(list.length);
+  if (!list.length) {
+    issueList.innerHTML = `<li class="empty-state">No issues found.</li>`;
+    return;
+  }
+  issueList.innerHTML = "";
+  list.forEach(it => {
+    const li = document.createElement("li");
+    li.className = "issue-item";
+    li.innerHTML = `
+      <div class="issue-item-main">
+        <div class="issue-item-title">${escapeHtml(it.issueDescription || "Untitled issue")}</div>
+        <div class="issue-item-sub">${escapeHtml(it.application || "")}</div>
+      </div>
+      <div class="issue-item-actions">
+        <button type="button" class="issue-menu-btn" aria-label="More actions">⋯</button>
+      </div>
+    `;
+    // Row click opens details
+    li.addEventListener("click", () => showDetailScreen(it.id));
+    // Dots click opens menu only (no navigation)
+    const dots = li.querySelector(".issue-menu-btn");
+    dots?.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      toggleIssueMenu({ issueId: it.id, anchorEl: dots, mode: "active" });
+    });
+    issueList.appendChild(li);
+  });
+}
+function renderBinList() {
+  // If you haven't added the Bin section in HTML yet, do nothing
+  if (!binList || !binCountPill) return;
+  closeAllIssueMenus();
+  binCountPill.textContent = String(deletedIssues.length);
+  if (!deletedIssues.length) {
+    binList.innerHTML = `<li class="empty-state">Bin is empty.</li>`;
+    return;
+  }
+  binList.innerHTML = "";
+  deletedIssues.forEach(it => {
+    const li = document.createElement("li");
+    li.className = "issue-item";
+    li.innerHTML = `
+      <div class="issue-item-main">
+        <div class="issue-item-title">${escapeHtml(it.issueDescription || "Untitled issue")}</div>
+        <div class="issue-item-sub">${escapeHtml(it.application || "")}</div>
+      </div>
+      <div class="issue-item-actions">
+        <button type="button" class="issue-menu-btn" aria-label="More actions">⋯</button>
+      </div>
+    `;
+    // In bin, clicking row does NOT open detail (optional) — keep it simple.
+    li.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+    });
+    const dots = li.querySelector(".issue-menu-btn");
+    dots?.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      toggleIssueMenu({ issueId: it.id, anchorEl: dots, mode: "bin" });
+    });
+    binList.appendChild(li);
+  });
+}
+// Close menu when clicking elsewhere
+document.addEventListener("click", (e) => {
+  const inMenu = e.target.closest?.(".issue-menu");
+  const inBtn = e.target.closest?.(".issue-menu-btn");
+  if (!inMenu && !inBtn) closeAllIssueMenus();
+});
+searchInput?.addEventListener("input", () => {
+  if (isInDetailScreen()) showListScreen();
+  renderIssueList();
+});
+/* =========
+   Detail screen
+========= */
+function findSelectedIssue() {
+  if (!selectedIssueId) return null;
+  return issues.find(x => x.id === selectedIssueId) || null;
+}
+function renderSelectedIssueDetails() {
+  if (!issueDetailsPanel) return;
+  const it = findSelectedIssue();
+  if (!it) {
+    issueDetailsPanel.innerHTML = `<div class="card"><div class="details-placeholder">Issue not found.</div></div>`;
+    return;
+  }
+  const checklistHtml = bulletsToHtml(it.checklistItems || []);
+  const zendesk = safeUrl(it.zendeskLink);
+  const templates = Array.isArray(it.templates) ? it.templates : [];
+  const templateButtons = templates
+    .map((t, idx) => {
+      const active = idx === 0 ? "active" : "";
+      return `<button type="button" class="template-tab ${active}" data-tidx="${idx}">
+        ${escapeHtml(t.name || `Template ${idx + 1}`)}
+      </button>`;
+    })
+    .join("");
+  issueDetailsPanel.innerHTML = `
+    <div class="card details-card">
+      <div class="card-head">
+        <div class="big-title">${escapeHtml(it.issueDescription || "Untitled issue")}</div>
+        <div class="card-actions">
+          ${it.application ? `<span class="pill">${escapeHtml(it.application)}</span>` : ""}
+          <button type="button" class="btn btn-secondary small" id="editIssueBtn">Edit</button>
+        </div>
+      </div>
+      <div id="detailsBodyView">
+        <div class="kv">
+          <div class="kv-row">
+            <div class="kv-key">Root cause</div>
+            <div class="kv-val">${escapeHtml(it.rootCause || "") || "<span class='muted'>—</span>"}</div>
+          </div>
+          <div class="kv-row">
+            <div class="kv-key">Checklist</div>
+            <div class="kv-val">${checklistHtml}</div>
+          </div>
+          <div class="kv-row">
+            <div class="kv-key">Solution</div>
+            <div class="kv-val prewrap">${escapeHtml(it.solution || "") || "—"}</div>
+          </div>
+          <div class="kv-row">
+            <div class="kv-key">Zendesk ticket</div>
+            <div class="kv-val">
+              ${
+                zendesk
+                  ? `<a class="link" href="${escapeHtml(zendesk)}" target="_blank" rel="noreferrer">${escapeHtml(zendesk)}</a>`
+                  : "<span class='muted'>—</span>"
+              }
+            </div>
+          </div>
+          <div class="kv-row">
+            <div class="kv-key">Email templates</div>
+            <div class="kv-val">
+              ${
+                templates.length
+                  ? `
+                    <div class="template-tabs" id="detailsTemplateTabs">${templateButtons}</div>
+                    <textarea id="detailsTemplateBox" class="details-template-editor" readonly rows="10">${escapeHtml(templates[0]?.body || "")}</textarea>
+                  `
+                  : "<span class='muted'>No templates saved.</span>"
+              }
+            </div>
+          </div>
+        </div>
+      </div>
+      <div id="detailsBodyEdit" class="hidden">
+        <div class="form-grid">
+          <div class="form-row">
+            <label>Issue Description</label>
+            <input id="editIssueDescription" type="text" value="${escapeHtml(it.issueDescription || "")}" />
+          </div>
+          <div class="form-row">
+            <label>Application</label>
+            <input id="editApplication" type="text" value="${escapeHtml(it.application || "")}" />
+          </div>
+          <div class="form-row">
+            <label>Root Cause</label>
+            <input id="editRootCause" type="text" value="${escapeHtml(it.rootCause || "")}" />
+          </div>
+          <div class="form-row">
+            <label>Checklists (one per line)</label>
+            <textarea id="editChecklists" rows="6">${escapeHtml((it.checklistItems || []).join("\n"))}</textarea>
+          </div>
+          <div class="form-row">
+            <label>Zendesk Ticket Link</label>
+            <input id="editZendesk" type="url" value="${escapeHtml(it.zendeskLink || "")}" />
+          </div>
+          <div class="form-row">
+            <label>Solution</label>
+            <textarea id="editSolution" rows="5">${escapeHtml(it.solution || "")}</textarea>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-primary" id="saveEditBtn">Save changes</button>
+          <button type="button" class="btn btn-secondary" id="cancelEditBtn">Cancel</button>
+        </div>
+      </div>
+    </div>
+  `;
+  const detailsTabs = document.getElementById("detailsTemplateTabs");
+  if (detailsTabs) {
+    detailsTabs.addEventListener("click", e => {
+      const btn = e.target.closest("button[data-tidx]");
+      if (!btn) return;
+      const idx = Number(btn.dataset.tidx);
+      const box = document.getElementById("detailsTemplateBox");
+      if (!box) return;
+      [...detailsTabs.querySelectorAll("button")].forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      box.value = templates[idx]?.body || "";
+    });
+  }
+  const editBtn = document.getElementById("editIssueBtn");
+  const viewBody = document.getElementById("detailsBodyView");
+  const editBody = document.getElementById("detailsBodyEdit");
+  editBtn?.addEventListener("click", () => {
+    viewBody?.classList.add("hidden");
+    editBody?.classList.remove("hidden");
+  });
+  document.getElementById("cancelEditBtn")?.addEventListener("click", () => {
+    renderSelectedIssueDetails();
+  });
+  document.getElementById("saveEditBtn")?.addEventListener("click", async () => {
+    const updated = {
+      issueDescription: (document.getElementById("editIssueDescription")?.value || "").trim(),
+      application: (document.getElementById("editApplication")?.value || "").trim(),
+      rootCause: (document.getElementById("editRootCause")?.value || "").trim(),
+      checklistItems: linesToBullets(document.getElementById("editChecklists")?.value || ""),
+      zendeskLink: (document.getElementById("editZendesk")?.value || "").trim(),
+      solution: (document.getElementById("editSolution")?.value || "").trim()
+    };
+    await updateIssueInFirestore(it.id, updated);
+  });
+}
+async function updateIssueInFirestore(docId, updatedFields) {
+  if (!ensureFirestoreReady()) return;
+  const { doc, updateDoc, serverTimestamp } = window.firebaseFns;
+  const ref = doc(window.db, "issues", docId);
+  await updateDoc(ref, {
+    ...updatedFields,
+    updatedAt: serverTimestamp()
+  });
+  await loadIssuesFromFirestore();
+  showDetailScreen(docId);
+}
+/* =========
+   Save new issue (with duplicate check)
+========= */
+function resetForm() {
+  if (issueDescription) issueDescription.value = "";
+  if (applicationSelect) applicationSelect.value = "";
+  if (rootCause) rootCause.value = "";
+  if (checklists) checklists.value = "";
+  if (zendeskLink) zendeskLink.value = "";
+  if (solution) solution.value = "";
+  templateState = structuredClone(DEFAULT_TEMPLATES);
+  selectedTemplateIndex = 0;
+  renderTemplateTabs();
+  if (templateEditor) templateEditor.value = templateState[0].body;
+  const box = ensureDupSuggestionBox();
+  if (box) {
+    box.classList.add("hidden");
+    box.innerHTML = "";
+  }
+}
+resetIssueBtn?.addEventListener("click", resetForm);
+saveIssueBtn?.addEventListener("click", async () => {
+  if (!ensureFirestoreReady()) return;
+  // Ensure loaded before duplicate check
+  if (!issues.length && !allIssues.length) await loadIssuesFromFirestore();
+  const desc = (issueDescription?.value || "").trim();
+  const app = (applicationSelect?.value || "").trim();
+  if (!desc) {
+    alert("Please enter an Issue Description.");
+    return;
+  }
+  if (!app) {
+    alert("Please select an Application (or add a new one).");
+    return;
+  }
+  const { exact, suggestions } = findSimilarIssuesForNewIssue(desc);
+  if (exact) {
+    const ok = confirm(
+      `This looks like an existing issue:\n\n- ${exact.issueDescription}\n\nDo you want to save anyway (creates a duplicate)?`
+    );
+    if (!ok) {
+      showOnlySection("common");
+      showListScreen();
+      if (searchInput) searchInput.value = exact.issueDescription || "";
+      renderIssueList();
+      return;
+    }
+  } else if (suggestions.length) {
+    const summary = suggestions
+      .map(s => `- ${s.issue.issueDescription} (${(s.score * 100).toFixed(0)}%)`)
+      .join("\n");
+    const ok = confirm(
+      `We found similar issues already added:\n\n${summary}\n\nDo you still want to save this as a new issue?`
+    );
+    if (!ok) return;
+  }
+  renderDuplicateSuggestions();
+  if (templateEditor) templateState[selectedTemplateIndex].body = templateEditor.value;
+  const payload = {
+    issueDescription: desc,
+    application: app,
+    rootCause: (rootCause?.value || "").trim(),
+    checklistItems: linesToBullets(checklists?.value || ""),
+    zendeskLink: (zendeskLink?.value || "").trim(),
+    solution: (solution?.value || "").trim(),
+    templates: templateState.map(t => ({
+      name: (t.name || "").trim(),
+      body: (t.body || "").trim()
+    })),
+    deleted: false,
+    deletedAt: null,
+    createdAt: window.firebaseFns.serverTimestamp(),
+    updatedAt: window.firebaseFns.serverTimestamp()
+  };
+  try {
+    const { collection, addDoc } = window.firebaseFns;
+    const colRef = collection(window.db, "issues");
+    await addDoc(colRef, payload);
+    resetForm();
+    showOnlySection("common");
+    showListScreen();
+    await loadIssuesFromFirestore();
+  } catch (e) {
+    console.error(e);
+    alert("Could not save. Please check Firestore setup and try again.");
+  }
+});
+/* =========================================================
+   HELP ME TROUBLESHOOT (NO AI)
+========================================================= */
+const DOC_URL =
+  "https://support.aquera.com/hc/en-us/articles/360052131934-Active-Directory-AD-Configuration-Guide#h_01F8CDRHWA2JG6V2DE0RCJK6VP";
+let helpFlowState = {
+  lastUserIssue: "",
+  lastMatchedIssue: null,
+  lastUserChecks: [],
+  lastMissing: [],
+  docConfirmed: false
+};
+function suggest409Variants() {
+  const variants = issues
+    .filter(it => normalizeForCompare(it.issueDescription || "").includes("409"))
+    .slice(0, 6);
+  if (!variants.length) return "";
+  return `
+    <div class="kv-row">
+      <div class="kv-key">Possible 409 issues in Common Issues</div>
+      <div class="kv-val">
+        <ul class="bullet-list">
+          ${variants
+            .map(v => `<li><button type="button" class="btn btn-secondary small" data-suggest-issue="${escapeHtml(v.issueDescription || "")}">${escapeHtml(v.issueDescription || "")}</button></li>`)
+            .join("")}
+        </ul>
+        <div class="hint">Click one to auto-fill the issue description.</div>
+      </div>
+    </div>
+  `;
+}
+function matchIssueByText(userIssueText = "") {
+  const q = normalizeForCompare(userIssueText);
+  if (!q) return null;
+  let best = null;
+  let bestScore = 0;
+  const qWords = q.split(" ").filter(Boolean);
+  for (const it of issues) {
+    const desc = normalizeForCompare(it.issueDescription || "");
+    const app = normalizeForCompare(it.application || "");
+    const root = normalizeForCompare(it.rootCause || "");
+    const checklist = normalizeForCompare((it.checklistItems || []).join(" "));
+    let score = 0;
+    if (desc.includes(q) || q.includes(desc)) score += 10;
+    for (const w of qWords) {
+      if (w.length < 3) continue;
+      if (desc.includes(w)) score += 2;
+      if (app.includes(w)) score += 1;
+      if (root.includes(w)) score += 1;
+      if (checklist.includes(w)) score += 0.5;
+    }
+    if (score > bestScore) {
+      bestScore = score;
+      best = it;
+    }
+  }
+  return bestScore >= 2 ? best : null;
+}
+function compareChecklists({ standard = [], user = [] }) {
+  const std = uniqueNormalized(standard);
+  const usr = uniqueNormalized(user);
+  const usrSet = new Set(usr.map(x => x.norm));
+  const missing = [];
+  for (const s of std) {
+    if (!usrSet.has(s.norm)) missing.push(s.raw);
+  }
+  return missing;
+}
+function renderHelpOutput({ matchedIssue, missingItems, userIssueText }) {
+  if (!helpResults) return;
+  const hasMatch = !!matchedIssue;
+  const missingCount = missingItems.length;
+  const matchCard = hasMatch
+    ? `
+      <div class="card details-card">
+        <div class="card-head">
+          <div class="card-title">Matched Common Issue</div>
+          <div class="card-actions">
+            ${matchedIssue.application ? `<span class="pill">${escapeHtml(matchedIssue.application)}</span>` : ""}
+          </div>
+        </div>
+        <div class="kv">
+          <div class="kv-row">
+            <div class="kv-key">Issue</div>
+            <div class="kv-val">${escapeHtml(matchedIssue.issueDescription || "Untitled issue")}</div>
+          </div>
+          <div class="kv-row">
+            <div class="kv-key">Standard checklist (from Common Issues)</div>
+            <div class="kv-val">${bulletsToHtml(matchedIssue.checklistItems || [])}</div>
+          </div>
+        </div>
+      </div>
+    `
+    : `
+      <div class="card details-card">
+        <div class="card-head">
+          <div class="card-title">No matching Common Issue found</div>
+        </div>
+        <div class="kv">
+          <div class="kv-row">
+            <div class="kv-key">What to do next</div>
+            <div class="kv-val">We will move to documentation as the next step.</div>
+          </div>
+        </div>
+      </div>
+    `;
+  const step1Card = hasMatch
+    ? `
+      <div class="card details-card">
+        <div class="card-head">
+          <div class="card-title">Step 1 — Compare your checks vs standard checklist</div>
+        </div>
+        <div class="kv">
+          ${
+            missingCount
+              ? `
+                <div class="kv-row">
+                  <div class="kv-key">You missed checking</div>
+                  <div class="kv-val">${bulletsToHtml(missingItems)}</div>
+                </div>
+              `
+              : `
+                <div class="kv-row">
+                  <div class="kv-key">Result</div>
+                  <div class="kv-val">Okay, you have checked everything.</div>
+                </div>
+              `
+          }
+        </div>
+      </div>
+    `
+    : "";
+  const step2Card = `
+    <div class="card details-card">
+      <div class="card-head">
+        <div class="card-title">Step 2 — Documentation</div>
+      </div>
+      <div class="kv">
+        <div class="kv-row">
+          <div class="kv-key">Documentation link</div>
+          <div class="kv-val">
+            <a class="link" href="${escapeHtml(DOC_URL)}" target="_blank" rel="noreferrer">
+              Active Directory troubleshooting documentation
+            </a>
+            <div class="hint">Open the link, follow the guide, then come back and click the button below.</div>
+          </div>
+        </div>
+        <div class="kv-row">
+          <div class="kv-key">After reviewing the documentation</div>
+          <div class="kv-val">
+            <button type="button" class="btn btn-secondary" id="btnDocNoLuck">
+              I have checked the documentation — still no luck.
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+  const variantsHint =
+    normalizeForCompare(userIssueText).trim() === "409" || normalizeForCompare(userIssueText).startsWith("409 ")
+      ? `<div class="card details-card"><div class="kv">${suggest409Variants()}</div></div>`
+      : "";
+  helpResults.innerHTML = `
+    ${variantsHint}
+    ${matchCard}
+    ${step1Card}
+    ${step2Card}
+    <div class="hint" style="margin-top:10px;">
+      Note: We only consider steps you explicitly typed. We do not assume anything.
+    </div>
+  `;
+  helpResults.querySelectorAll("button[data-suggest-issue]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const text = btn.getAttribute("data-suggest-issue") || "";
+      if (helpIssueInput) helpIssueInput.value = text;
+    });
+  });
+  document.getElementById("btnDocNoLuck")?.addEventListener("click", () => {
+    helpFlowState.docConfirmed = true;
+    renderStep3Prompt();
+  });
+}
+function buildChatGPTPrompt() {
+  const issueText = helpFlowState.lastUserIssue || "";
+  const matched = helpFlowState.lastMatchedIssue;
+  const missing = helpFlowState.lastMissing || [];
+  const checks = helpFlowState.lastUserChecks || [];
+  const suspectedRootCause = matched?.rootCause ? matched.rootCause : "Unknown / needs investigation";
+  const stdChecklist = matched?.checklistItems || [];
+  const missingBlock = missing.length
+    ? `Missing checks (from the standard checklist that were NOT confirmed):\n- ${missing.join("\n- ")}\n`
+    : `Missing checks: None (all standard checks appear completed).\n`;
+  return `
+You are helping troubleshoot an Aquera integration issue.
+Issue description:
+${issueText}
+Suspected root cause:
+${suspectedRootCause}
+Standard checklist for this issue type:
+${stdChecklist.length ? "- " + stdChecklist.join("\n- ") : "- No standard checklist was found in our Common Issues database."}
+Checks already completed by me:
+${checks.length ? "- " + checks.join("\n- ") : "- (none provided)"}
+${missingBlock}
+Documentation reviewed:
+Yes — I reviewed the Active Directory configuration/troubleshooting documentation but still no luck.
+Current status:
+Issue persists. Need next best investigation steps and what logs/fields to inspect.
+Please propose:
+1) The next 5–10 investigative steps in priority order
+2) What specific logs/fields to look for
+3) What likely causes remain and how to validate each
+I will attach:
+- Relevant integration log.txt files
+- Relevant application log.txt files
+- The integration / customer script JSON file
+- Ticket details (error code, timestamps, affected user, environment)
+  `.trim();
+}
+function renderStep3Prompt() {
+  if (!helpResults) return;
+  const prompt = buildChatGPTPrompt();
+  helpResults.insertAdjacentHTML(
+    "beforeend",
+    `
+    <div class="card details-card">
+      <div class="card-head">
+        <div class="card-title">Step 3 — ChatGPT-ready prompt</div>
+      </div>
+      <div class="kv">
+        <div class="kv-row">
+          <div class="kv-key">System message</div>
+          <div class="kv-val">Hey, no worries. I will create a ChatGPT-ready prompt that you can paste directly into ChatGPT.</div>
+        </div>
+        <div class="kv-row">
+          <div class="kv-key">Copy/paste this prompt into ChatGPT</div>
+          <div class="kv-val">
+            <textarea class="details-template-editor" id="chatgptPromptBox">${escapeHtml(prompt)}</textarea>
+            <div class="row-between" style="margin-top:10px;">
+              <button type="button" class="btn btn-primary" id="copyPromptBtn">Copy prompt</button>
+              <div class="hint">Reminder: attach integration logs, application logs, customer script JSON, and ticket details.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    `
+  );
+  document.getElementById("copyPromptBtn")?.addEventListener("click", async () => {
+    const box = document.getElementById("chatgptPromptBox");
+    const text = box?.value || "";
     try {
-      setAuthBusy(false);
-
-      if (!user) {
-        showAuthGate();
-        renderAuthView(AUTH_VIEW.LOGIN);
-        return;
+      await navigator.clipboard.writeText(text);
+      alert("Prompt copied to clipboard.");
+    } catch {
+      if (box) {
+        box.focus();
+        box.select();
+        document.execCommand("copy");
+        alert("Prompt copied (fallback).");
       }
-
-      showApp();
-
-      if (ensureFirestoreReady()) {
-        try {
-          const providerId = user?.providerData?.[0]?.providerId || "";
-          const providerHint = providerId === "password" ? "password" : "google";
-          await ensureUserProfileForAuthUser(user, providerHint);
-          await updateHeaderUserName(user);
-        } catch (error) {
-          console.warn("Background profile setup error:", error);
-        }
-      } else if (userProfileNameEl) {
-        const first = firstNameFallbackFromAuth(user);
-        userProfileNameEl.textContent = first;
-        if (userProfileAvatarEl) {
-          userProfileAvatarEl.textContent = initialsFromName(first, "");
-        }
-      }
-
-      if (typeof onAuthed === "function") {
-        await onAuthed(user);
-      }
-    } catch (error) {
-      console.error(error);
-      setAuthBusy(false);
-      showAuthGate();
-      renderAuthView(AUTH_VIEW.LOGIN);
-      setAuthError("Something went wrong loading the portal. Please refresh.");
     }
   });
 }
-
+async function handleHelpAnalyzeClick() {
+  if (!helpIssueInput || !helpResults) return;
+  const issueText = (helpIssueInput.value || "").trim();
+  const checkedText = (helpCheckedInput?.value || "").trim();
+  if (!issueText) {
+    helpResults.innerHTML = `<div class="muted">Please enter an issue description.</div>`;
+    return;
+  }
+  if (!issues.length) {
+    helpResults.innerHTML = `<div class="muted">Loading Common Issues…</div>`;
+    await loadIssuesFromFirestore();
+  }
+  const matched = matchIssueByText(issueText);
+  const userChecksRaw = linesToBullets(checkedText).filter(isStepLikeLine);
+  let missing = [];
+  if (matched) {
+    const standard = (matched.checklistItems || []).filter(Boolean);
+    missing = compareChecklists({ standard, user: userChecksRaw });
+  }
+  helpFlowState.lastUserIssue = issueText;
+  helpFlowState.lastMatchedIssue = matched;
+  helpFlowState.lastUserChecks = userChecksRaw;
+  helpFlowState.lastMissing = missing;
+  helpFlowState.docConfirmed = false;
+  renderHelpOutput({ matchedIssue: matched, missingItems: missing, userIssueText: issueText });
+}
+helpAnalyzeBtn?.addEventListener("click", handleHelpAnalyzeClick);
+helpClearBtn?.addEventListener("click", () => {
+  if (helpIssueInput) helpIssueInput.value = "";
+  if (helpCheckedInput) helpCheckedInput.value = "";
+  if (helpResults) {
+    helpResults.innerHTML = `<div class="muted">Enter an issue + what you checked, then click “Analyze my checklist”.</div>`;
+  }
+  helpFlowState = {
+    lastUserIssue: "",
+    lastMatchedIssue: null,
+    lastUserChecks: [],
+    lastMissing: [],
+    docConfirmed: false
+  };
+});
 /* =========
-   Theme
+   Init
 ========= */
-
+const themeToggle = document.getElementById("themeToggle");
 function applySavedTheme() {
   const saved = localStorage.getItem("theme");
   if (saved === "light") {
@@ -864,7 +1157,6 @@ function applySavedTheme() {
     if (themeToggle) themeToggle.textContent = "☀️";
   }
 }
-
 if (themeToggle) {
   themeToggle.addEventListener("click", () => {
     const isLight = document.documentElement.classList.toggle("light-theme");
@@ -877,19 +1169,13 @@ if (themeToggle) {
     }
   });
 }
-
-/* =========
-   Init
-========= */
-
 async function init() {
   applySavedTheme();
-
-  await initAuthGate({
-    onAuthed: async () => {
-      await loadIssuesFromFirestore();
-    }
-  });
+  loadApplicationOptions();
+  renderTemplateTabs();
+  if (templateEditor) templateEditor.value = templateState[0].body;
+  showOnlySection("common");
+  showListScreen();
+  await loadIssuesFromFirestore();
 }
-
 init();
