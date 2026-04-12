@@ -86,8 +86,8 @@ input {
 .auth-shell {
   width: min(1280px, 100%);
   display: grid;
-  grid-template-columns: 1.06fr 0.94fr;
-  gap: 36px;
+  grid-template-columns: 0.95fr 0.85fr;
+  gap: 32px;
   align-items: stretch;
 }
 
@@ -122,9 +122,9 @@ input {
 }
 
 .login-logo-wrap {
-  width: 108px;
-  height: 108px;
-  border-radius: 28px;
+  width: 92px;
+  height: 92px;
+  border-radius: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -140,8 +140,8 @@ input {
 }
 
 .login-logo {
-  width: 66px;
-  height: 66px;
+  width: 54px;
+  height: 54px;
   object-fit: contain;
 }
 
@@ -162,21 +162,21 @@ input {
 }
 
 .auth-copy {
-  max-width: 760px;
+  max-width: 520px;
   display: flex;
   flex-direction: column;
-  gap: 22px;
+  gap: 18px;
 }
 
 .auth-copy h1 {
   margin: 0;
-  font-size: clamp(54px, 6vw, 90px);
-  line-height: 0.92;
-  letter-spacing: -0.05em;
+  font-size: clamp(28px, 4.2vw, 64px);
+  line-height: 0.98;
+  letter-spacing: -0.04em;
   font-family: Georgia, "Times New Roman", serif;
   font-weight: 700;
   color: #0f172a;
-  max-width: 760px;
+  max-width: 100%;
 }
 
 :root:not(.light-theme) .auth-copy h1 {
@@ -185,10 +185,10 @@ input {
 
 .auth-copy p {
   margin: 0;
-  font-size: 17px;
-  line-height: 1.7;
+  font-size: 16px;
+  line-height: 1.65;
   color: var(--muted);
-  max-width: 420px;
+  max-width: 360px;
   font-weight: 500;
 }
 
@@ -385,7 +385,7 @@ input {
   }
 
   .auth-copy h1 {
-    font-size: 58px;
+    font-size: 48px;
   }
 
   .auth-copy p {
@@ -427,8 +427,8 @@ input {
   }
 
   .auth-copy h1 {
-    font-size: 42px;
-    line-height: 0.98;
+    font-size: 36px;
+    line-height: 1.02;
   }
 
   .auth-copy p {
