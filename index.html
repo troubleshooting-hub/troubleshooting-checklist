@@ -4,9 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 
+  <base href="/troubleshooting-checklist/">
   <title>Troubleshooting Checklist Portal</title>
 
-  <link rel="stylesheet" href="style.css?v=35" />
+  <link rel="stylesheet" href="./style.css?v=37" />
 </head>
 
 <body>
@@ -184,40 +185,41 @@
 ====================================================== -->
 <div id="appRoot" class="hidden">
 
-<header class="site-header">
-  <div class="header-inner header-flex">
-    <img class="brand-logo" src="assets/aquera-logo.png" alt="Aquera" />
+  <header class="site-header">
+    <div class="header-inner header-flex">
+      <img class="brand-logo" src="assets/aquera-logo.png" alt="Aquera" />
 
-    <div class="header-text">
-      <h1>Troubleshooting Checklist Portal</h1>
-      <p>Internal Support &amp; Investigation Guide</p>
-    </div>
-
-    <div class="header-actions">
-      <button id="themeToggle" class="theme-toggle" type="button">☀️</button>
-
-      <div id="userProfilePill" class="user-pill" title="Signed in user">
-        <span id="userProfileAvatar" class="user-avatar" aria-hidden="true">U</span>
-        <span id="userProfileName" class="user-name">User</span>
+      <div class="header-text">
+        <h1>Troubleshooting Checklist Portal</h1>
+        <p>Internal Support &amp; Investigation Guide</p>
       </div>
 
-      <button id="authLogoutBtn" class="btn btn-secondary small" type="button">Sign out</button>
+      <div class="header-actions">
+        <button id="themeToggle" class="theme-toggle" type="button">☀️</button>
+
+        <div id="userProfilePill" class="user-pill" title="Signed in user">
+          <span id="userProfileAvatar" class="user-avatar" aria-hidden="true">U</span>
+          <span id="userProfileName" class="user-name">User</span>
+        </div>
+
+        <button id="authLogoutBtn" class="btn btn-secondary small" type="button">Sign out</button>
+      </div>
     </div>
-  </div>
-</header>
+  </header>
 
-<main class="page">
-  <!-- IMPORTANT:
-       Your FULL portal markup must stay here exactly as before.
-       Do not replace your actual Common / Bin / New / Help sections with a placeholder.
-  -->
+  <main class="page">
+    <!-- IMPORTANT:
+         Replace this with your full existing portal markup:
+         Common / Bin / New / Help sections.
+         Do not leave this as placeholder in production.
+    -->
 
-  <!-- paste your existing Common / Bin / New / Help sections here -->
-</main>
+    <!-- paste your existing Common / Bin / New / Help sections here -->
+  </main>
 
-<footer class="site-footer">
-  Internal Use Only | Troubleshooting Portal
-</footer>
+  <footer class="site-footer">
+    Internal Use Only | Troubleshooting Portal
+  </footer>
 
 </div>
 
@@ -302,9 +304,8 @@
     signOut,
     deleteUser
   };
-
-
 </script>
+
 <script src="./script.js?v=37"></script>
 </body>
 </html>

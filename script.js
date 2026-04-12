@@ -1,8 +1,8 @@
 /* =========================================================
    Troubleshooting Checklist Portal — AUTH + USER PROFILES
    FIXED:
-   - Prevents infinite "Checking session..." state
-   - Fast auth resolution with safe fallback to login
+   - No infinite "Checking session..." state
+   - Fallback only hides loader, does NOT block Firebase callback
    - Email login / signup / reset password
    - Google sign-in
    - User profile creation in Firestore
@@ -103,10 +103,6 @@ const authLogoutBtn = document.getElementById("authLogoutBtn");
 const userProfileNameEl = document.getElementById("userProfileName");
 const userProfileAvatarEl = document.getElementById("userProfileAvatar");
 
-/* =========
-   Optional portal DOM hooks
-========= */
-
 const themeToggle = document.getElementById("themeToggle");
 
 /* =========
@@ -123,7 +119,6 @@ function ensureFirestoreReady() {
 
 function requireFirestoreFns(names = []) {
   if (!ensureFirestoreReady()) return { ok: false, missing: names };
-
   const missing = names.filter((name) => !window.firebaseFns?.[name]);
   return { ok: missing.length === 0, missing };
 }
@@ -140,8 +135,9 @@ const AUTH_VIEW = {
 
 let authView = AUTH_VIEW.LOGIN;
 let authBusy = false;
-let authSessionResolved = false;
+let authListenerHandled = false;
 let authFallbackTimer = null;
+let authUIBound = false;
 
 function showAuthGate() {
   authGate?.classList.remove("hidden");
@@ -182,7 +178,7 @@ function ensureInlineErrorEl(inputEl) {
 
 function setFieldError(inputEl, msg = "") {
   const errEl = ensureInlineErrorEl(inputEl);
-  if (!errEl) return;
+  if (!errEl || !inputEl) return;
 
   if (!msg) {
     errEl.textContent = "";
@@ -356,12 +352,10 @@ async function tryAcquireNameLock(fullNameKey, uid) {
 }
 
 async function ensureUserProfileForAuthUser(user, providerHint = "") {
-  if (!user?.uid || !ensureFirestoreReady()) return;
-
-  let existingSnap = null;
+  if (!user?.uid || !ensureFirestoreReady()) return null;
 
   try {
-    existingSnap = await getUserDoc(user.uid);
+    const existingSnap = await getUserDoc(user.uid);
     if (existingSnap.exists()) return existingSnap.data();
   } catch (error) {
     console.warn("User profile lookup failed:", error);
@@ -643,11 +637,8 @@ async function handlePasswordReset() {
 
   try {
     setAuthBusy(true, "Sending reset email…");
-    const basePath = document.baseURI.replace(location.origin, "").replace(/\/+$/, "");
-    const continueUrl = `${location.origin}${basePath}`;
-
+    const continueUrl = `${location.origin}${location.pathname.replace(/\/[^/]*$/, "/")}`;
     await window.firebaseAuthFns.sendPasswordResetEmail(window.auth, email, { url: continueUrl });
-
     setAuthBusy(false);
     setAuthError("If an account exists for this email, a reset link has been sent.");
   } catch (error) {
@@ -663,6 +654,9 @@ async function handlePasswordReset() {
 ========= */
 
 function bindAuthUI() {
+  if (authUIBound) return;
+  authUIBound = true;
+
   authToggleModeBtn?.addEventListener("click", () => {
     if (authBusy) return;
     if (authView === AUTH_VIEW.LOGIN) renderAuthView(AUTH_VIEW.SIGNUP);
@@ -723,6 +717,8 @@ function bindAuthUI() {
     if (!ensureAuthReady()) return;
     try {
       await window.firebaseAuthFns.signOut(window.auth);
+      showAuthGate();
+      renderAuthView(AUTH_VIEW.LOGIN);
     } catch (error) {
       console.error(error);
     }
@@ -793,22 +789,20 @@ async function initAuthGate({ onAuthed } = {}) {
   const { onAuthStateChanged } = window.firebaseAuthFns;
 
   setAuthBusy(true, "Checking session…");
-  authSessionResolved = false;
+  authListenerHandled = false;
 
-  // Safe fallback: never let the page hang forever
+  // Fallback only hides spinner; it does NOT block Firebase callback
   authFallbackTimer = window.setTimeout(() => {
-    if (authSessionResolved) return;
+    if (authListenerHandled) return;
 
-    console.warn("Auth session check timed out. Falling back to login.");
-    authSessionResolved = true;
+    console.warn("Auth session check is taking longer than expected. Showing login UI.");
     setAuthBusy(false);
     showAuthGate();
     renderAuthView(AUTH_VIEW.LOGIN);
-  }, 6000);
+  }, 4000);
 
   onAuthStateChanged(window.auth, async (user) => {
-    if (authSessionResolved) return;
-    authSessionResolved = true;
+    authListenerHandled = true;
 
     if (authFallbackTimer) {
       clearTimeout(authFallbackTimer);
@@ -824,10 +818,8 @@ async function initAuthGate({ onAuthed } = {}) {
         return;
       }
 
-      // Show app immediately so user never feels stuck
       showApp();
 
-      // Background profile work
       if (ensureFirestoreReady()) {
         try {
           const providerId = user?.providerData?.[0]?.providerId || "";
@@ -838,9 +830,10 @@ async function initAuthGate({ onAuthed } = {}) {
           console.warn("Background profile setup error:", error);
         }
       } else if (userProfileNameEl) {
-        userProfileNameEl.textContent = firstNameFallbackFromAuth(user);
+        const first = firstNameFallbackFromAuth(user);
+        userProfileNameEl.textContent = first;
         if (userProfileAvatarEl) {
-          userProfileAvatarEl.textContent = initialsFromName(firstNameFallbackFromAuth(user), "");
+          userProfileAvatarEl.textContent = initialsFromName(first, "");
         }
       }
 
