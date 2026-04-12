@@ -56,7 +56,7 @@ body {
   font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   background:
     radial-gradient(1000px 500px at 20% 10%, rgba(37, 99, 235, 0.16), transparent 60%),
-    radial-gradient(800px 400px at 70% 80%, rgba(16, 185, 129, 0.08), transparent 60%),
+    radial-gradient(900px 500px at 78% 82%, rgba(16, 185, 129, 0.08), transparent 60%),
     linear-gradient(180deg, var(--bg-soft), var(--bg));
   color: var(--text);
 }
@@ -74,7 +74,6 @@ input {
   display: none !important;
 }
 
-/* Page */
 .auth-page {
   min-height: 100vh;
   display: flex;
@@ -86,15 +85,12 @@ input {
 .auth-shell {
   width: min(1280px, 100%);
   display: grid;
-  grid-template-columns: 0.95fr 0.85fr;
-  gap: 32px;
-  align-items: stretch;
+  grid-template-columns: 1fr;
 }
 
-/* Left panel */
 .auth-left {
-  min-height: 720px;
-  background: linear-gradient(180deg, rgba(255,255,255,0.46), rgba(255,255,255,0.18));
+  min-height: 760px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.48), rgba(255,255,255,0.18));
   border: 1px solid var(--border);
   border-radius: 28px;
   box-shadow: var(--shadow);
@@ -107,11 +103,10 @@ input {
 }
 
 .auth-left-inner {
-  height: 100%;
-  padding: 36px 38px 42px;
+  min-height: 760px;
+  padding: 32px 40px 40px;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
 }
 
 .auth-topbar {
@@ -122,15 +117,15 @@ input {
 }
 
 .login-logo-wrap {
-  width: 92px;
-  height: 92px;
-  border-radius: 24px;
+  width: 120px;
+  height: 120px;
+  border-radius: 30px;
   display: flex;
   align-items: center;
   justify-content: center;
   background: rgba(255,255,255,0.22);
-  border: 1px solid rgba(255,255,255,0.3);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.35);
+  border: 1px solid rgba(255,255,255,0.32);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.4);
 }
 
 :root:not(.light-theme) .login-logo-wrap {
@@ -140,8 +135,8 @@ input {
 }
 
 .login-logo {
-  width: 54px;
-  height: 54px;
+  width: 76px;
+  height: 76px;
   object-fit: contain;
 }
 
@@ -162,21 +157,23 @@ input {
 }
 
 .auth-copy {
-  max-width: 520px;
+  margin-top: 56px;
+  text-align: center;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  align-items: center;
+  gap: 14px;
 }
 
 .auth-copy h1 {
   margin: 0;
-  font-size: clamp(28px, 4.2vw, 64px);
-  line-height: 0.98;
-  letter-spacing: -0.04em;
+  font-size: clamp(42px, 5vw, 82px);
+  line-height: 0.94;
+  letter-spacing: -0.045em;
   font-family: Georgia, "Times New Roman", serif;
   font-weight: 700;
   color: #0f172a;
-  max-width: 100%;
+  max-width: 760px;
 }
 
 :root:not(.light-theme) .auth-copy h1 {
@@ -185,28 +182,27 @@ input {
 
 .auth-copy p {
   margin: 0;
-  font-size: 16px;
+  font-size: 17px;
   line-height: 1.65;
   color: var(--muted);
-  max-width: 360px;
+  max-width: 520px;
   font-weight: 500;
 }
 
-/* Right panel */
 .auth-right {
   display: flex;
-  align-items: center;
   justify-content: center;
+  margin-top: 42px;
 }
 
 .auth-card {
   width: 100%;
-  max-width: 560px;
+  max-width: 700px;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 28px;
   box-shadow: var(--shadow);
-  padding: 40px 34px 32px;
+  padding: 34px 34px 28px;
 }
 
 .auth-view h2 {
@@ -225,7 +221,6 @@ input {
   line-height: 1.55;
 }
 
-/* Alerts */
 .login-error,
 .login-success {
   margin-bottom: 18px;
@@ -247,7 +242,6 @@ input {
   color: var(--success-text);
 }
 
-/* Form */
 .form-row {
   display: grid;
   gap: 14px;
@@ -290,7 +284,6 @@ input {
   box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
 }
 
-/* Buttons */
 .primary-btn,
 .google-btn {
   width: 100%;
@@ -346,7 +339,6 @@ input {
   font-weight: 800;
 }
 
-/* Links */
 .auth-links {
   display: flex;
   align-items: center;
@@ -373,22 +365,29 @@ input {
   text-decoration: underline;
 }
 
-/* Responsive */
 @media (max-width: 1024px) {
-  .auth-shell {
-    grid-template-columns: 1fr;
-    gap: 24px;
+  .auth-left {
+    min-height: auto;
   }
 
-  .auth-left {
-    min-height: 380px;
+  .auth-left-inner {
+    min-height: auto;
+    padding: 28px;
+  }
+
+  .auth-copy {
+    margin-top: 40px;
   }
 
   .auth-copy h1 {
-    font-size: 48px;
+    font-size: 54px;
   }
 
-  .auth-copy p {
+  .auth-right {
+    margin-top: 32px;
+  }
+
+  .auth-card {
     max-width: 100%;
   }
 }
@@ -400,43 +399,45 @@ input {
 
   .auth-left-inner,
   .auth-card {
-    padding: 24px;
-  }
-
-  .form-row.two-col {
-    grid-template-columns: 1fr;
+    padding: 22px;
   }
 
   .auth-left {
-    min-height: 320px;
+    border-radius: 24px;
   }
 
   .login-logo-wrap {
-    width: 84px;
-    height: 84px;
-    border-radius: 22px;
+    width: 96px;
+    height: 96px;
+    border-radius: 24px;
   }
 
   .login-logo {
-    width: 52px;
-    height: 52px;
+    width: 62px;
+    height: 62px;
   }
 
   .auth-copy {
-    gap: 16px;
+    margin-top: 28px;
+    gap: 12px;
   }
 
   .auth-copy h1 {
-    font-size: 36px;
-    line-height: 1.02;
+    font-size: 38px;
+    line-height: 1;
   }
 
   .auth-copy p {
-    font-size: 16px;
+    font-size: 15px;
+    max-width: 100%;
   }
 
   .auth-view h2 {
     font-size: 34px;
+  }
+
+  .form-row.two-col {
+    grid-template-columns: 1fr;
   }
 
   .auth-links {
