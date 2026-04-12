@@ -6,35 +6,131 @@
   <title>Login | Troubleshooting Checklist Portal</title>
 
   <link rel="icon" href="./favicon.ico" />
-  <link rel="stylesheet" href="./login.css?v=1" />
+  <link rel="stylesheet" href="./login.css?v=2" />
 </head>
 <body>
-  <main class="login-page">
-    <div class="login-shell">
-      <section class="login-left">
-        <div class="login-left-inner">
-          <div class="login-logo-wrap">
-            <img src="./assets/aquera-logo.png" alt="Aquera" class="login-logo" />
+  <main class="auth-page">
+    <div class="auth-shell">
+      <section class="auth-left">
+        <div class="auth-left-inner">
+          <div class="auth-topbar">
+            <div class="login-logo-wrap">
+              <img src="./assets/aquera-logo.png" alt="Aquera" class="login-logo" />
+            </div>
+
+            <button id="themeToggle" class="theme-toggle" type="button" aria-label="Toggle theme">
+              ☀️
+            </button>
           </div>
 
-          <div class="login-copy">
+          <div class="auth-copy">
             <h1>Troubleshooting Checklist Portal</h1>
             <p>Search issues. Follow checklists. Resolve faster.</p>
           </div>
         </div>
       </section>
 
-      <section class="login-right">
-        <div class="login-card">
-          <h2>Sign in</h2>
-          <p class="login-sub">Use your Google account to continue</p>
-
+      <section class="auth-right">
+        <div class="auth-card">
+          <div id="authMessage" class="login-success hidden"></div>
           <div id="loginError" class="login-error hidden"></div>
 
-          <button id="googleLoginBtn" class="google-btn" type="button">
-            <span class="google-icon">G</span>
-            <span>Continue with Google</span>
-          </button>
+          <!-- SIGN IN VIEW -->
+          <div id="signInView" class="auth-view">
+            <h2>Sign In</h2>
+            <p class="login-sub">Access the troubleshooting portal securely.</p>
+
+            <div class="form-group">
+              <label for="signInEmail">Email</label>
+              <input id="signInEmail" type="email" placeholder="Enter your email" />
+            </div>
+
+            <div class="form-group">
+              <label for="signInPassword">Password</label>
+              <input id="signInPassword" type="password" placeholder="Enter your password" />
+            </div>
+
+            <button id="emailLoginBtn" class="primary-btn" type="button">
+              Sign In
+            </button>
+
+            <button id="googleLoginBtn" class="google-btn" type="button">
+              <span class="google-icon">G</span>
+              <span>Continue with Google</span>
+            </button>
+
+            <div class="auth-links">
+              <button id="showForgotBtn" class="text-btn" type="button">Forgot Password?</button>
+              <button id="showSignUpBtn" class="text-btn" type="button">Create Account</button>
+            </div>
+          </div>
+
+          <!-- SIGN UP VIEW -->
+          <div id="signUpView" class="auth-view hidden">
+            <h2>Create Account</h2>
+            <p class="login-sub">Create your account to access the portal.</p>
+
+            <div class="form-row two-col">
+              <div class="form-group">
+                <label for="signUpFirstName">First Name</label>
+                <input id="signUpFirstName" type="text" placeholder="First name" />
+              </div>
+
+              <div class="form-group">
+                <label for="signUpLastName">Last Name</label>
+                <input id="signUpLastName" type="text" placeholder="Last name" />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="signUpUsername">Username</label>
+              <input id="signUpUsername" type="text" placeholder="Choose a username" />
+            </div>
+
+            <div class="form-group">
+              <label for="signUpEmail">Email ID</label>
+              <input id="signUpEmail" type="email" placeholder="Enter your email" />
+            </div>
+
+            <div class="form-row two-col">
+              <div class="form-group">
+                <label for="signUpPassword">Password</label>
+                <input id="signUpPassword" type="password" placeholder="Create password" />
+              </div>
+
+              <div class="form-group">
+                <label for="signUpConfirmPassword">Confirm Password</label>
+                <input id="signUpConfirmPassword" type="password" placeholder="Confirm password" />
+              </div>
+            </div>
+
+            <button id="createAccountBtn" class="primary-btn" type="button">
+              Create Account
+            </button>
+
+            <div class="auth-links single-link">
+              <button id="backToSignInFromSignUp" class="text-btn" type="button">Back to Sign In</button>
+            </div>
+          </div>
+
+          <!-- FORGOT PASSWORD VIEW -->
+          <div id="forgotPasswordView" class="auth-view hidden">
+            <h2>Forgot Password</h2>
+            <p class="login-sub">Enter your email and we’ll send you a password reset link.</p>
+
+            <div class="form-group">
+              <label for="forgotEmail">Email</label>
+              <input id="forgotEmail" type="email" placeholder="Enter your email" />
+            </div>
+
+            <button id="sendResetBtn" class="primary-btn" type="button">
+              Send Reset Link
+            </button>
+
+            <div class="auth-links single-link">
+              <button id="backToSignInFromForgot" class="text-btn" type="button">Back to Sign In</button>
+            </div>
+          </div>
         </div>
       </section>
     </div>
@@ -46,9 +142,20 @@
       getAuth,
       GoogleAuthProvider,
       signInWithPopup,
+      signInWithEmailAndPassword,
+      createUserWithEmailAndPassword,
+      sendPasswordResetEmail,
       onAuthStateChanged,
+      updateProfile,
       signOut
     } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js";
+
+    import {
+      getFirestore,
+      doc,
+      setDoc,
+      serverTimestamp
+    } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyC7hu52JLlf9_IA0UA10RaIRiWaoWhIpr8",
@@ -61,17 +168,30 @@
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
+    const db = getFirestore(app);
 
     window.auth = auth;
+    window.db = db;
+
     window.firebaseAuthFns = {
       GoogleAuthProvider,
       signInWithPopup,
+      signInWithEmailAndPassword,
+      createUserWithEmailAndPassword,
+      sendPasswordResetEmail,
       onAuthStateChanged,
+      updateProfile,
       signOut
     };
 
+    window.firebaseDbFns = {
+      doc,
+      setDoc,
+      serverTimestamp
+    };
+
     const s = document.createElement("script");
-    s.src = "./login.js?v=1";
+    s.src = "./login.js?v=2";
     s.defer = true;
     document.body.appendChild(s);
   </script>
