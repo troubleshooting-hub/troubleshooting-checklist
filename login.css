@@ -10,7 +10,6 @@
   --accent: #2563eb;
   --accent-hover: #1d4ed8;
   --radius: 24px;
-  --radius-md: 18px;
   --radius-sm: 14px;
   --danger-bg: rgba(239, 68, 68, 0.08);
   --danger-border: rgba(239, 68, 68, 0.18);
@@ -79,17 +78,16 @@ input {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 28px;
+  padding: 16px;
 }
 
 .auth-shell {
-  width: min(1280px, 100%);
+  width: min(1240px, 100%);
   display: grid;
   grid-template-columns: 1fr;
 }
 
 .auth-left {
-  min-height: 760px;
   background: linear-gradient(180deg, rgba(255,255,255,0.48), rgba(255,255,255,0.18));
   border: 1px solid var(--border);
   border-radius: 28px;
@@ -103,8 +101,7 @@ input {
 }
 
 .auth-left-inner {
-  min-height: 760px;
-  padding: 32px 40px 40px;
+  padding: 24px 32px 28px;
   display: flex;
   flex-direction: column;
 }
@@ -117,9 +114,9 @@ input {
 }
 
 .login-logo-wrap {
-  width: 120px;
-  height: 120px;
-  border-radius: 30px;
+  width: 96px;
+  height: 96px;
+  border-radius: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -135,15 +132,15 @@ input {
 }
 
 .login-logo {
-  width: 76px;
-  height: 76px;
+  width: 60px;
+  height: 60px;
   object-fit: contain;
 }
 
 .theme-toggle {
-  width: 52px;
-  height: 52px;
-  border-radius: 18px;
+  width: 48px;
+  height: 48px;
+  border-radius: 16px;
   border: 1px solid var(--border);
   background: var(--panel-strong);
   color: var(--text);
@@ -157,23 +154,23 @@ input {
 }
 
 .auth-copy {
-  margin-top: 56px;
+  margin-top: 20px;
   text-align: center;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 14px;
+  gap: 10px;
 }
 
 .auth-copy h1 {
   margin: 0;
-  font-size: clamp(42px, 5vw, 82px);
-  line-height: 0.94;
+  font-size: clamp(34px, 4vw, 64px);
+  line-height: 1;
   letter-spacing: -0.045em;
   font-family: Georgia, "Times New Roman", serif;
   font-weight: 700;
   color: #0f172a;
-  max-width: 760px;
+  max-width: 700px;
 }
 
 :root:not(.light-theme) .auth-copy h1 {
@@ -182,17 +179,17 @@ input {
 
 .auth-copy p {
   margin: 0;
-  font-size: 17px;
-  line-height: 1.65;
+  font-size: 15px;
+  line-height: 1.6;
   color: var(--muted);
-  max-width: 520px;
+  max-width: 480px;
   font-weight: 500;
 }
 
 .auth-right {
   display: flex;
   justify-content: center;
-  margin-top: 42px;
+  margin-top: 24px;
 }
 
 .auth-card {
@@ -202,28 +199,28 @@ input {
   border: 1px solid var(--border);
   border-radius: 28px;
   box-shadow: var(--shadow);
-  padding: 34px 34px 28px;
+  padding: 26px 28px 24px;
 }
 
 .auth-view h2 {
   margin: 0 0 10px;
-  font-size: 44px;
-  line-height: 1.02;
+  font-size: 40px;
+  line-height: 1.04;
   font-weight: 800;
-  letter-spacing: -0.035em;
+  letter-spacing: -0.03em;
   color: var(--text);
 }
 
 .login-sub {
-  margin: 0 0 26px;
+  margin: 0 0 22px;
   color: var(--muted);
-  font-size: 17px;
-  line-height: 1.55;
+  font-size: 16px;
+  line-height: 1.5;
 }
 
 .login-error,
 .login-success {
-  margin-bottom: 18px;
+  margin-bottom: 16px;
   padding: 12px 14px;
   border-radius: var(--radius-sm);
   font-size: 14px;
@@ -244,7 +241,7 @@ input {
 
 .form-row {
   display: grid;
-  gap: 14px;
+  gap: 12px;
 }
 
 .form-row.two-col {
@@ -252,7 +249,7 @@ input {
 }
 
 .form-group {
-  margin-bottom: 16px;
+  margin-bottom: 14px;
 }
 
 .form-group label {
@@ -265,7 +262,7 @@ input {
 
 .form-group input {
   width: 100%;
-  height: 54px;
+  height: 52px;
   border-radius: 16px;
   border: 1px solid var(--input-border);
   background: var(--input-bg);
@@ -287,7 +284,7 @@ input {
 .primary-btn,
 .google-btn {
   width: 100%;
-  height: 56px;
+  height: 54px;
   border: 0;
   border-radius: 16px;
   font-size: 16px;
@@ -303,7 +300,7 @@ input {
 .primary-btn {
   background: var(--accent);
   color: #fff;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
 }
 
 .primary-btn:hover {
@@ -344,7 +341,7 @@ input {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-top: 12px;
+  margin-top: 10px;
 }
 
 .auth-links.single-link {
@@ -366,86 +363,145 @@ input {
 }
 
 @media (max-width: 1024px) {
-  .auth-left {
-    min-height: auto;
-  }
-
   .auth-left-inner {
-    min-height: auto;
-    padding: 28px;
+    padding: 22px 24px 24px;
   }
 
   .auth-copy {
-    margin-top: 40px;
+    margin-top: 18px;
   }
 
   .auth-copy h1 {
-    font-size: 54px;
+    font-size: 48px;
+    max-width: 100%;
+  }
+
+  .auth-copy p {
+    max-width: 100%;
   }
 
   .auth-right {
-    margin-top: 32px;
+    margin-top: 20px;
   }
 
   .auth-card {
     max-width: 100%;
+    padding: 24px;
+  }
+
+  .auth-view h2 {
+    font-size: 34px;
   }
 }
 
 @media (max-width: 640px) {
   .auth-page {
-    padding: 16px;
-  }
-
-  .auth-left-inner,
-  .auth-card {
-    padding: 22px;
+    padding: 12px;
+    align-items: flex-start;
   }
 
   .auth-left {
-    border-radius: 24px;
+    border-radius: 22px;
   }
 
-  .login-logo-wrap {
-    width: 96px;
-    height: 96px;
-    border-radius: 24px;
+  .auth-left-inner {
+    padding: 18px 18px 20px;
   }
 
-  .login-logo {
-    width: 62px;
-    height: 62px;
-  }
-
-  .auth-copy {
-    margin-top: 28px;
+  .auth-topbar {
     gap: 12px;
   }
 
+  .login-logo-wrap {
+    width: 82px;
+    height: 82px;
+    border-radius: 20px;
+  }
+
+  .login-logo {
+    width: 50px;
+    height: 50px;
+  }
+
+  .theme-toggle {
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+  }
+
+  .auth-copy {
+    margin-top: 16px;
+    gap: 8px;
+  }
+
   .auth-copy h1 {
-    font-size: 38px;
-    line-height: 1;
+    font-size: 34px;
+    line-height: 1.02;
   }
 
   .auth-copy p {
-    font-size: 15px;
+    font-size: 14px;
+    line-height: 1.55;
     max-width: 100%;
   }
 
+  .auth-right {
+    margin-top: 16px;
+  }
+
+  .auth-card {
+    padding: 20px 18px 18px;
+    border-radius: 22px;
+  }
+
   .auth-view h2 {
-    font-size: 34px;
+    font-size: 30px;
+    margin-bottom: 8px;
+  }
+
+  .login-sub {
+    font-size: 15px;
+    margin-bottom: 18px;
   }
 
   .form-row.two-col {
     grid-template-columns: 1fr;
   }
 
+  .form-group {
+    margin-bottom: 12px;
+  }
+
+  .form-group input {
+    height: 50px;
+  }
+
+  .primary-btn,
+  .google-btn {
+    height: 52px;
+  }
+
   .auth-links {
     flex-direction: column;
     align-items: flex-start;
+    gap: 6px;
   }
 
   .auth-links.single-link {
     align-items: center;
+  }
+}
+
+@media (max-width: 420px) {
+  .auth-copy h1 {
+    font-size: 30px;
+  }
+
+  .auth-copy p {
+    font-size: 13.5px;
+  }
+
+  .auth-view h2 {
+    font-size: 28px;
   }
 }
