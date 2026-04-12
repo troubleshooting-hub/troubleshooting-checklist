@@ -80,25 +80,26 @@ input {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
+  padding: 28px;
 }
 
 .auth-shell {
-  width: min(1240px, 100%);
+  width: min(1280px, 100%);
   display: grid;
-  grid-template-columns: 1.08fr 0.92fr;
-  gap: 28px;
+  grid-template-columns: 1.06fr 0.94fr;
+  gap: 36px;
   align-items: stretch;
 }
 
 /* Left panel */
 .auth-left {
-  min-height: 700px;
-  background: linear-gradient(180deg, rgba(255,255,255,0.48), rgba(255,255,255,0.18));
+  min-height: 720px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.46), rgba(255,255,255,0.18));
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: 28px;
   box-shadow: var(--shadow);
   overflow: hidden;
+  position: relative;
 }
 
 :root:not(.light-theme) .auth-left {
@@ -107,7 +108,7 @@ input {
 
 .auth-left-inner {
   height: 100%;
-  padding: 32px;
+  padding: 36px 38px 42px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -121,31 +122,33 @@ input {
 }
 
 .login-logo-wrap {
-  width: 96px;
-  height: 96px;
-  border-radius: 24px;
+  width: 108px;
+  height: 108px;
+  border-radius: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
   background: rgba(255,255,255,0.22);
-  border: 1px solid rgba(255,255,255,0.28);
+  border: 1px solid rgba(255,255,255,0.3);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.35);
 }
 
 :root:not(.light-theme) .login-logo-wrap {
   background: rgba(255,255,255,0.05);
   border-color: rgba(255,255,255,0.1);
+  box-shadow: none;
 }
 
 .login-logo {
-  width: 56px;
-  height: 56px;
+  width: 66px;
+  height: 66px;
   object-fit: contain;
 }
 
 .theme-toggle {
-  width: 48px;
-  height: 48px;
-  border-radius: 16px;
+  width: 52px;
+  height: 52px;
+  border-radius: 18px;
   border: 1px solid var(--border);
   background: var(--panel-strong);
   color: var(--text);
@@ -159,24 +162,34 @@ input {
 }
 
 .auth-copy {
-  max-width: 680px;
+  max-width: 760px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
 }
 
 .auth-copy h1 {
-  margin: 0 0 16px;
-  font-size: clamp(44px, 6vw, 78px);
-  line-height: 0.95;
-  letter-spacing: -0.045em;
+  margin: 0;
+  font-size: clamp(54px, 6vw, 90px);
+  line-height: 0.92;
+  letter-spacing: -0.05em;
   font-family: Georgia, "Times New Roman", serif;
   font-weight: 700;
+  color: #0f172a;
+  max-width: 760px;
+}
+
+:root:not(.light-theme) .auth-copy h1 {
+  color: #f8fafc;
 }
 
 .auth-copy p {
   margin: 0;
-  font-size: 19px;
-  line-height: 1.65;
+  font-size: 17px;
+  line-height: 1.7;
   color: var(--muted);
-  max-width: 520px;
+  max-width: 420px;
+  font-weight: 500;
 }
 
 /* Right panel */
@@ -191,25 +204,25 @@ input {
   max-width: 560px;
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: 28px;
   box-shadow: var(--shadow);
-  padding: 38px 32px 30px;
+  padding: 40px 34px 32px;
 }
 
 .auth-view h2 {
-  margin: 0 0 8px;
-  font-size: 42px;
-  line-height: 1.05;
+  margin: 0 0 10px;
+  font-size: 44px;
+  line-height: 1.02;
   font-weight: 800;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.035em;
   color: var(--text);
 }
 
 .login-sub {
-  margin: 0 0 24px;
+  margin: 0 0 26px;
   color: var(--muted);
   font-size: 17px;
-  line-height: 1.5;
+  line-height: 1.55;
 }
 
 /* Alerts */
@@ -258,12 +271,12 @@ input {
 
 .form-group input {
   width: 100%;
-  height: 52px;
+  height: 54px;
   border-radius: 16px;
   border: 1px solid var(--input-border);
   background: var(--input-bg);
   color: var(--text);
-  padding: 0 14px;
+  padding: 0 16px;
   outline: none;
   transition: 0.18s ease;
 }
@@ -339,7 +352,7 @@ input {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-top: 10px;
+  margin-top: 12px;
 }
 
 .auth-links.single-link {
@@ -364,14 +377,19 @@ input {
 @media (max-width: 1024px) {
   .auth-shell {
     grid-template-columns: 1fr;
+    gap: 24px;
   }
 
   .auth-left {
-    min-height: 340px;
+    min-height: 380px;
   }
 
   .auth-copy h1 {
-    font-size: 54px;
+    font-size: 58px;
+  }
+
+  .auth-copy p {
+    max-width: 100%;
   }
 }
 
@@ -389,8 +407,32 @@ input {
     grid-template-columns: 1fr;
   }
 
+  .auth-left {
+    min-height: 320px;
+  }
+
+  .login-logo-wrap {
+    width: 84px;
+    height: 84px;
+    border-radius: 22px;
+  }
+
+  .login-logo {
+    width: 52px;
+    height: 52px;
+  }
+
+  .auth-copy {
+    gap: 16px;
+  }
+
   .auth-copy h1 {
     font-size: 42px;
+    line-height: 0.98;
+  }
+
+  .auth-copy p {
+    font-size: 16px;
   }
 
   .auth-view h2 {
