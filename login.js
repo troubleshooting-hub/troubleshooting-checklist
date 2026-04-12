@@ -16,8 +16,9 @@ function setLoginError(message = "") {
 
 function setLoginBusy(isBusy) {
   if (!googleLoginBtn) return;
+
   googleLoginBtn.disabled = isBusy;
-  googleLoginBtn.textContent = isBusy ? "Signing in..." : "";
+
   googleLoginBtn.innerHTML = isBusy
     ? `<span>Signing in...</span>`
     : `<span class="google-icon">G</span><span>Continue with Google</span>`;
@@ -29,9 +30,12 @@ async function handleGoogleLogin() {
     setLoginBusy(true);
 
     const provider = new window.firebaseAuthFns.GoogleAuthProvider();
+
     await window.firebaseAuthFns.signInWithPopup(window.auth, provider);
 
+    // Redirect after success
     window.location.href = "./portal.html";
+
   } catch (error) {
     console.error(error);
     setLoginBusy(false);
@@ -40,11 +44,13 @@ async function handleGoogleLogin() {
 }
 
 function initLoginPage() {
+  // 🔥 Wait until Firebase is actually available (fixes race condition completely)
   if (!window.auth || !window.firebaseAuthFns) {
-    setLoginError("Firebase is not ready. Please refresh the page.");
+    setTimeout(initLoginPage, 100); // retry quickly
     return;
   }
 
+  // If already logged in → skip login page
   window.firebaseAuthFns.onAuthStateChanged(window.auth, (user) => {
     if (user) {
       window.location.href = "./portal.html";

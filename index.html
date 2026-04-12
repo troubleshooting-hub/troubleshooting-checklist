@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Login | Troubleshooting Checklist Portal</title>
 
-  <link rel="icon" href="favicon.ico" />
-  <link rel="stylesheet" href="./login.css" />
+  <link rel="icon" href="./favicon.ico" />
+  <link rel="stylesheet" href="./login.css?v=1" />
 </head>
 <body>
   <main class="login-page">
@@ -14,7 +14,7 @@
       <section class="login-left">
         <div class="login-left-inner">
           <div class="login-logo-wrap">
-            <img src="assets/aquera-logo.png" alt="Aquera" class="login-logo" />
+            <img src="./assets/aquera-logo.png" alt="Aquera" class="login-logo" />
           </div>
 
           <div class="login-copy">
@@ -46,7 +46,8 @@
       getAuth,
       GoogleAuthProvider,
       signInWithPopup,
-      onAuthStateChanged
+      onAuthStateChanged,
+      signOut
     } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js";
 
     const firebaseConfig = {
@@ -65,10 +66,14 @@
     window.firebaseAuthFns = {
       GoogleAuthProvider,
       signInWithPopup,
-      onAuthStateChanged
+      onAuthStateChanged,
+      signOut
     };
-  </script>
 
-  <script src="./login.js"></script>
+    const s = document.createElement("script");
+    s.src = "./login.js?v=1";
+    s.defer = true;
+    document.body.appendChild(s);
+  </script>
 </body>
 </html>
