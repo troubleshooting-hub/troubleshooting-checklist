@@ -76,7 +76,8 @@ input {
 .auth-page {
   min-height: 100vh;
   display: flex;
-  align-items: center;
+  align-items: flex-start;   /* 👈 key change */
+  padding-top: 10px;         /* 👈 slight top push */
   justify-content: center;
   padding: 16px;
 }
@@ -189,7 +190,7 @@ input {
 .auth-right {
   display: flex;
   justify-content: center;
-  margin-top: 24px;
+  margin-top: 12px;   /* 👈 reduced */
 }
 
 .auth-card {
